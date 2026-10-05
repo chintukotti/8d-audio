@@ -1,0 +1,31 @@
+# Netlify configuration for 8D Studio.
+#
+# The whole app is one self-contained index.html, so there is no build step:
+# Netlify just publishes this folder as-is.
+
+[build]
+  publish = "."
+  command = ""
+
+# Long cache for the parts that never change between deploys, no cache for the
+# page itself (so a redeploy is visible immediately).
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/lib/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

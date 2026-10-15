@@ -69,7 +69,7 @@ main{max-width:1240px;margin:0 auto;padding:var(--gap) 16px 40px;display:flex;fl
   display:flex;align-items:center;gap:8px}
 .sec h2 svg{width:15px;height:15px;flex:none;opacity:.8}
 .sec .hint{font-size:12.5px;color:var(--dim);flex:1;min-width:120px}
-.sec .tools{margin-left:auto;display:flex;gap:8px}
+.sec .tools{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .cols{display:grid;gap:var(--gap);align-items:start}
 @media(min-width:920px){.cols{grid-template-columns:minmax(340px,400px) minmax(0,1fr)}}
 
@@ -120,6 +120,8 @@ main{max-width:1240px;margin:0 auto;padding:var(--gap) 16px 40px;display:flex;fl
 }
 .pbtn:hover{color:var(--txt);border-color:var(--line2);background:rgba(255,255,255,.06)}
 .pbtn:active{transform:translateY(1px)}
+.pbtn.mine{border-style:dashed;border-color:var(--acc2);color:var(--acc2)}
+.pbtn.mine.on{background:var(--grad);color:#070a10;border-style:solid;border-color:transparent}
 .pbtn.on{background:var(--grad);color:#070a10;border-color:transparent;font-weight:650;
   box-shadow:0 5px 18px -8px rgba(111,141,255,.95)}
 .pdesc{
@@ -346,6 +348,8 @@ kbd{font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.06);bord
       <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.8 4.9 4.9 1.8-4.9 1.8L12 16.9l-1.8-4.9L5.3 10.2l4.9-1.8L12 3.5z"/><path d="M18.5 16.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9z"/></svg>Presets</h2>
       <span class="hint" id="presetHint"></span>
       <div class="tools">
+        <button class="btn sm gh" id="saveBtn" title="Save the current settings as your own preset, saved in this browser">Save</button>
+        <button class="btn sm gh" id="forgetBtn" title="Remove your saved preset" style="display:none">Forget</button>
         <button class="btn sm gh" id="randomBtn" title="Build a random setting">Shuffle</button>
         <button class="btn sm gh" id="resetBtn">Reset</button>
       </div>
@@ -456,6 +460,7 @@ kbd{font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.06);bord
         <div class="fld" style="margin-bottom:10px"><span class="k">Estimated output size</span></div>
         <div class="sizebox" id="sizeBox">
           <div class="szrow"><span>Your source</span><b id="szSrc">—</b></div>
+          <div class="szrow"><span>Output length</span><b id="szDur">—</b></div>
           <div class="szrow hi"><span id="szOutLbl">MP3 320 kbps</span><b id="szOut">—</b></div>
           <div class="szrow"><span>Same audio as uncompressed WAV</span><b id="szWav">—</b></div>
         </div>
@@ -825,6 +830,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
    * The CLI builds its flags from this, the browser builds its sliders from it.
    * ========================================================================= */
   const GROUPS = [
+    { id: 'feel',   title: 'Feel',    hint: 'The whole song, before any 8D processing' },
     { id: 'motion', title: 'Motion',  hint: 'How the sound travels around your head' },
     { id: 'space',  title: 'Space',   hint: 'Depth, distance and the room' },
     { id: 'tone',   title: 'Tone',    hint: 'Frequency balance' },
@@ -834,6 +840,10 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
   const SHAPES = ['circle', 'ellipse', 'figure8', 'pendulum', 'spiral', 'lissajous'];
 
   const PARAMS = {
+    /* ---- Feel ---- */
+    speed:     { def: 1,     min: 0.5,  max: 1.5, step: 0.01, label: 'Speed (slow-mo)', unit: '\u00d7', group: 'feel',
+                 help: 'Below 1.00 slows the song down and drops the pitch \u2014 the classic "slowed" sound. Above 1.00 speeds it up. The Slowed presets use 0.92. Orbit timing is unaffected. Want your own rate? Drag it, then Save preset.' },
+
     /* ---- Motion ---- */
     lap:       { def: 8,     min: 1,    max: 60,  step: 0.1,  label: 'Orbit time',       unit: 's/lap', group: 'motion',
                  help: 'Seconds for one full lap around your head.' },
@@ -865,14 +875,15 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     monoBass:  { def: false, bool: true, group: 'space', label: 'Mono bass' },
     subFreq:   { def: 110,   min: 40,   max: 300, step: 5,    label: 'Mono bass below',  unit: 'Hz',    group: 'space', when: 'monoBass',
                  help: 'Keeps deep bass centred so the orbit never sounds like it floats away.' },
-    revMix:    { def: 0.35,  min: 0,    max: 1,   step: 0.01, label: 'Reverb mix',       unit: '',      group: 'space' },
-    room:      { def: 2.6,   min: 0.3,  max: 6,   step: 0.1,  label: 'Room',             unit: 's',     group: 'space',
+    reverb:    { def: true,  bool: true, group: 'space', label: 'Reverb' },
+    revMix:    { def: 0.35,  min: 0,    max: 1,   step: 0.01, label: 'Reverb mix',       unit: '',      group: 'space', when: 'reverb' },
+    room:      { def: 2.6,   min: 0.3,  max: 6,   step: 0.1,  label: 'Room',             unit: 's',     group: 'space', when: 'reverb',
                  help: 'Reverb decay time (RT60).' },
-    damp:      { def: 0.35,  min: 0,    max: 0.9, step: 0.01, label: 'Tail damping',     unit: '',      group: 'space' },
-    predelay:  { def: 18,    min: 0,    max: 120, step: 1,    label: 'Pre-delay',        unit: 'ms',    group: 'space', adv: true,
+    damp:      { def: 0.35,  min: 0,    max: 0.9, step: 0.01, label: 'Tail damping',     unit: '',      group: 'space', when: 'reverb' },
+    predelay:  { def: 18,    min: 0,    max: 120, step: 1,    label: 'Pre-delay',        unit: 'ms',    group: 'space', when: 'reverb', adv: true,
                  help: 'Gap before the reverb starts — a strong distance cue.' },
-    revWidth:  { def: 1.15,  min: 0,    max: 1.5, step: 0.01, label: 'Tail width',       unit: '',      group: 'space', adv: true },
-    wetLag:    { def: 0.08,  min: 0,    max: 0.3, step: 0.01, label: 'Tail lag',         unit: 'lap',   group: 'space', adv: true,
+    revWidth:  { def: 1.15,  min: 0,    max: 1.5, step: 0.01, label: 'Tail width',       unit: '',      group: 'space', when: 'reverb', adv: true },
+    wetLag:    { def: 0.08,  min: 0,    max: 0.3, step: 0.01, label: 'Tail lag',         unit: 'lap',   group: 'space', when: 'reverb', adv: true,
                  help: 'How far the reverb trails behind the dry sound as it orbits.' },
 
     /* ---- Tone ---- */
@@ -881,7 +892,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
 
     /* ---- Output ---- */
     gain:      { def: 0,     min: -12,  max: 12,  step: 0.5,  label: 'Output trim',      unit: 'dB',    group: 'output' },
-    normalize: { def: true,  bool: true, group: 'output', label: 'Normalize to −0.3 dBFS' },
+    normalize: { def: true,  bool: true, group: 'output', label: 'Normalize (−1 dBFS peak)' },
     limiter:   { def: true,  bool: true, group: 'output', label: 'Soft limiter' },
   };
 
@@ -910,6 +921,10 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     'rave':          { lap: 3,  width: 1.35, depth: 1.2,  swirl: 0.8,  itd: 0.75, behind: 6,   revMix: 0.3,  room: 1.8, damp: 0.25, predelay: 10, bass: 5, air: 3 },
     'sleep':         { lap: 40, width: 0.35, depth: 0.6,  swirl: 0.18, itd: 0.2,  behind: 2,   revMix: 0.4,  room: 4.5, damp: 0.6, predelay: 30, crossfeed: 0.12, bass: 2, air: -4 },
     'cafe':          { lap: 22, width: 0.6,  depth: 0.7,  swirl: 0.35, itd: 0.4,  behind: 3,   revMix: 0.5,  room: 2.2, damp: 0.6, predelay: 12, crossfeed: 0.2, bass: 2, air: -1 },
+    'slowed':        { speed: 0.92, lap: 14, width: 0.75, depth: 0.9,  swirl: 0.45, itd: 0.5,  behind: 4,   reverb: false, revMix: 0, bass: 5, air: 1 },
+    'reverb':        { speed: 1,    lap: 9,  width: 0.9,  depth: 1,    swirl: 0.6,  itd: 0.6,  behind: 4.5, revMix: 0.75, room: 5, damp: 0.45, predelay: 55, revWidth: 1.3, bass: 2, air: 4 },
+    'slowed-reverb': { speed: 0.92, lap: 12, width: 0.85, depth: 1,    swirl: 0.5,  itd: 0.55, behind: 5,   revMix: 0.55, room: 4.5, damp: 0.5, predelay: 35, bass: 4, air: 1 },
+    'nightcore':     { speed: 1.3,  lap: 6,  width: 0.95, depth: 1,    swirl: 0.6,  itd: 0.6,  behind: 4,   revMix: 0.25, room: 2.2, damp: 0.35, predelay: 10, bass: 1, air: 4 },
     'lofi':          { lap: 11, width: 0.7,  depth: 0.9,  swirl: 0.3,  itd: 0.3,  behind: 3,   revMix: 0.3,  room: 2.2, damp: 0.7, crossfeed: 0.18, bass: 5, air: -4 },
     'boombap':       { lap: 6,  width: 0.85, depth: 1,    swirl: 0.3,  itd: 0.35, behind: 3,   revMix: 0.25, room: 1.6, damp: 0.6, bass: 6, air: -1, subFreq: 90 },
     'headphone-test': { lap: 6, width: 1.5,  depth: 1.5,  swirl: 1,    itd: 1,    behind: 12,  revMix: 0.2,  room: 2,   damp: 0.3, predelay: 5, bass: 0, air: 0 },
@@ -936,6 +951,10 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     'rave':          { label: 'Rave',          blurb: 'Fast, tight, aggressive. Wears you out in a good way' },
     'sleep':         { label: 'Sleep',         blurb: 'One lap per 40 seconds, barely there. Very gentle' },
     'cafe':          { label: 'Café',          blurb: 'Sitting in a room with the band off to one side' },
+    'slowed':        { label: 'Slowed',        blurb: 'Pitched down 8% (0.92×) — just slower, with no reverb at all' },
+    'reverb':        { label: 'Reverb',        blurb: 'Full speed, huge hall tail. No slow-mo' },
+    'slowed-reverb': { label: 'Slowed + Reverb', blurb: 'Pitched down 8% (0.92×) with a big warm tail — the classic' },
+    'nightcore':     { label: 'Nightcore',     blurb: 'Sped up and brightened up — the mirror image' },
     'lofi':          { label: 'Lo-fi',         blurb: 'Fat bottom, rolled-off top, small room' },
     'boombap':       { label: 'Boom bap',      blurb: 'Hip-hop head-nodder — sub locked centre, slow orbit' },
     'headphone-test': { label: 'Headphone test', blurb: 'Everything at maximum. Use it to check your cans' },
@@ -998,6 +1017,25 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
       while (p < 0) p += this.n;
       const i = p | 0, f = p - i, j = i + 1 >= this.n ? 0 : i + 1;
       return this.buf[i] * (1 - f) + this.buf[j] * f;
+    }
+    /* Catmull-Rom read. Used where the delay is modulated (ITD): linearly
+     * interpolating a moving delay line is amplitude-modulated, which shows up
+     * as grit on fast orbits.
+     *
+     * Index order matters here. read() derives its position from the write head,
+     * so a LARGER delay is a LOWER buffer index: y0 (delay i1-1) sits one slot
+     * ahead of y1 (delay i1), not behind it. Getting this backwards scrambles
+     * the four taps and turns interpolation into a discontinuity generator. */
+    readCubic(d) {
+      const i1 = d | 0, f = d - i1, n = this.n;
+      let a = this.i - 1 - i1;            // delay i1
+      let b = a + 1, c = a - 1, e = a - 2; // delays i1-1, i1+1, i1+2
+      a %= n; if (a < 0) a += n;
+      b %= n; if (b < 0) b += n;
+      c %= n; if (c < 0) c += n;
+      e %= n; if (e < 0) e += n;
+      const y0 = this.buf[b], y1 = this.buf[a], y2 = this.buf[c], y3 = this.buf[e];
+      return y1 + 0.5 * f * (y2 - y0 + f * (2 * y0 - 5 * y1 + 4 * y2 - y3 + f * (3 * (y1 - y2) + y3 - y0)));
     }
     clear() { this.buf.fill(0); }
   }
@@ -1138,7 +1176,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
       const keys = ['lap', 'width', 'depth', 'swirl', 'itd', 'behind', 'elevation', 'crossfeed',
                     'revMix', 'room', 'damp', 'predelay', 'revWidth', 'wetLag', 'bass', 'air', 'gain', 'subFreq'];
       for (const k of keys) s[k] = force ? p[k] : s[k] + (p[k] - s[k]) * a;
-      for (const k of ['shape', 'ccw', 'sync', 'bpm', 'beats', 'hrtf', 'monoBass', 'normalize', 'limiter', 'phase'])
+      for (const k of ['shape', 'ccw', 'sync', 'bpm', 'beats', 'hrtf', 'monoBass', 'normalize', 'limiter', 'phase', 'reverb'])
         s[k] = p[k];
 
       this.bassF[0].coefs(coLowShelf(fs, 180, s.bass));  this.bassF[1].coefs(coLowShelf(fs, 180, s.bass));
@@ -1234,8 +1272,8 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
 
         // ITD: the ear facing away hears it late
         itdL.write(l); itdR.write(r);
-        let dl = itdL.read(t.itdAmp * openR * hr);
-        let dr = itdR.read(t.itdAmp * openL * hr);
+        let dl = itdL.readCubic(t.itdAmp * openR * hr);
+        let dr = itdR.readCubic(t.itdAmp * openL * hr);
 
         // head shadow: two cascaded 1-poles ≈ 12 dB/oct of occlusion
         dl = sh1L.processW(sh0L.processW(dl, kaL), kaL);
@@ -1249,21 +1287,28 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
         /* --- wet path --- */
         /* Freeverb's 0.015 input scaling already lands the wet near unity;
          * the dry/wet balance is the revMix control's job, not a hidden fudge. */
-        preL.write(l * t.verb.fixedGain);
-        preR.write(r * t.verb.fixedGain);
-        t.verb.process(preL.read(t.preSamp), preR.read(t.preSamp));
+        if (s.reverb && s.revMix > 0) {
+          preL.write(l * t.verb.fixedGain);
+          preR.write(r * t.verb.fixedGain);
+          t.verb.process(preL.read(t.preSamp), preR.read(t.preSamp));
 
-        let vl = t.verb.wetL, vr = t.verb.wetR;
-        const mid = (vl + vr) * 0.5, side = (vl - vr) * 0.5 * s.revWidth;
-        vl = mid + side; vr = mid - side;
+          let vl = t.verb.wetL, vr = t.verb.wetR;
+          const mid = (vl + vr) * 0.5, side = (vl - vr) * 0.5 * s.revWidth;
+          vl = mid + side; vr = mid - side;
 
-        const xyW = orbitXY(theta - t.wetLagRad, s.shape);
-        const xw = clamp(xyW.x * s.width * 1.15, -1.5, 1.5);
-        const angW = (clamp(xw, -1, 1) + 1) * 0.25 * Math.PI;
-        const wgL = 0.04 + 0.96 * Math.cos(angW);
-        const wgR = 0.04 + 0.96 * Math.sin(angW);
-        outL += vl * wgL * t.wetGain;
-        outR += vr * wgR * t.wetGain;
+          const xyW = orbitXY(theta - t.wetLagRad, s.shape);
+          const xw = clamp(xyW.x * s.width * 1.15, -1.5, 1.5);
+          const angW = (clamp(xw, -1, 1) + 1) * 0.25 * Math.PI;
+          const wgL = 0.04 + 0.96 * Math.cos(angW);
+          const wgR = 0.04 + 0.96 * Math.sin(angW);
+          outL += vl * wgL * t.wetGain;
+          outR += vr * wgR * t.wetGain;
+        } else {
+          /* Keep feeding the network silence so switching reverb off lets an
+           * existing tail ring out instead of cutting it dead (which clicks). */
+          preL.write(0); preR.write(0);
+          t.verb.process(0, 0);
+        }
 
         /* --- crossfeed --- */
         if (t.xfAmt > 0) {
@@ -1294,6 +1339,159 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
       }
       this.theta = theta; this.peak = peak; this.clipped = clipped;
     }
+  }
+
+  /* =========================================================================
+   * Slow-mo / speed.
+   *
+   * Resamples the SOURCE, so playing time and pitch move together — what a
+   * record player does at a lower speed, and what the "slowed" sound is. Both
+   * render pipelines call this once, up front; live browser playback uses
+   * playbackRate, which is the same operation done natively.
+   *
+   * This is a windowed-sinc resampler with a precomputed phase table, not a
+   * Catmull-Rom interpolator: an interpolator has no stopband, so speeding a
+   * track up folded everything above fs/2/speed back down as aliasing (measured
+   * at -0.7 dB of junk above 19 kHz — plainly audible as fizz). The kernel's
+   * cutoff tracks the rate change, which is what makes it anti-aliased.
+   * ========================================================================= */
+  const RS_TAPS = 14;            // taps either side of the read point
+  const RS_PHASES = 2048;        // phase resolution; drift is < 0.0005 samples
+  const _rsCache = {};
+
+  function resampleKernel(cutoff) {
+    const key = cutoff.toFixed(5);
+    if (_rsCache[key]) return _rsCache[key];
+    const N = RS_TAPS * 2;
+    const table = new Float32Array(RS_PHASES * N);
+    for (let ph = 0; ph < RS_PHASES; ph++) {
+      const frac = ph / RS_PHASES;
+      let sum = 0;
+      for (let k = 0; k < N; k++) {
+        const x = (k - RS_TAPS) - frac;
+        const ax = Math.abs(x);
+        let v = 0;
+        if (ax < RS_TAPS) {
+          const t = cutoff * x;
+          v = (ax < 1e-12 ? 1 : Math.sin(Math.PI * t) / (Math.PI * t)) *
+              (0.42 + 0.5 * Math.cos(Math.PI * x / RS_TAPS) + 0.08 * Math.cos(2 * Math.PI * x / RS_TAPS));
+        }
+        table[ph * N + k] = v;
+        sum += v;
+      }
+      for (let k = 0; k < N; k++) table[ph * N + k] /= sum;     // unity DC gain
+    }
+    _rsCache[key] = { table, N };
+    return _rsCache[key];
+  }
+
+  function resampleTime(L, R, speed) {
+    if (!speed || Math.abs(speed - 1) < 1e-4) return { L, R, speed: 1 };
+    const srclen = L.length;
+    const n = Math.max(2, Math.round(srclen / speed));
+    const oL = new Float32Array(n), oR = new Float32Array(n);
+    /* Speeding up (speed > 1) must band-limit the source or the top end folds.
+     * A 28-tap kernel has a transition band roughly 8 kHz wide, so the cutoff
+     * sits at 80% of nyquist/speed: that puts the whole transition below the
+     * folding point instead of straddling it. Costs the top ~2 kHz of a
+     * sped-up track — inaudible, and far better than audible aliasing. */
+    const cutoff = speed > 1 ? (1 / speed) * 0.8 : 1;
+    const K = resampleKernel(cutoff), N = K.N, tab = K.table;
+    const hasR = !!R;
+    for (let i = 0; i < n; i++) {
+      const p = i * speed;
+      const base = p | 0;
+      const ph = ((p - base) * RS_PHASES) | 0;
+      const off = (ph < RS_PHASES ? ph : RS_PHASES - 1) * N;
+      let aL = 0, aR = 0;
+      for (let k = 0; k < N; k++) {
+        const h = tab[off + k];
+        if (h === 0) continue;
+        let j = base + k - RS_TAPS;
+        if (j < 0) j = 0; else if (j >= srclen) j = srclen - 1;
+        aL += L[j] * h;
+        if (hasR) aR += R[j] * h;
+      }
+      oL[i] = aL;
+      oR[i] = hasR ? aR : aL;
+    }
+    return { L: oL, R: oR, speed, cutoff };
+  }
+
+  /* =========================================================================
+   * True-peak measurement.
+   *
+   * A waveform's real peak sits BETWEEN its samples, and lossy codecs overshoot
+   * it a little further on decode. Normalising to a sample peak of -0.1 dBFS
+   * therefore guarantees clipped playback. This oversamples 4x with a short
+   * windowed sinc to find the real peak — but only near the loud parts, so it
+   * stays cheap on long files.
+   * ========================================================================= */
+  const TP_OV = 4, TP_TAPS = 8;
+  let _tpKernel = null;
+  function truePeakKernel() {
+    if (_tpKernel) return _tpKernel;
+    const N = TP_TAPS * 2;
+    const t = new Float32Array(TP_OV * N);
+    for (let ph = 0; ph < TP_OV; ph++) {
+      const frac = ph / TP_OV;
+      let sum = 0;
+      for (let k = 0; k < N; k++) {
+        const x = (k - TP_TAPS) - frac;
+        const ax = Math.abs(x);
+        let v = 0;
+        if (ax < TP_TAPS) {
+          v = ax < 1e-12 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x);
+          v *= 0.42 + 0.5 * Math.cos(Math.PI * x / TP_TAPS) + 0.08 * Math.cos(2 * Math.PI * x / TP_TAPS);
+        }
+        t[ph * N + k] = v;
+        sum += v;
+      }
+      for (let k = 0; k < N; k++) t[ph * N + k] /= sum;
+    }
+    _tpKernel = { table: t, N };
+    return _tpKernel;
+  }
+
+  function truePeak(L, R) {
+    let peak = 0;
+    for (let i = 0; i < L.length; i++) { const v = L[i] < 0 ? -L[i] : L[i]; if (v > peak) peak = v; }
+    if (R) for (let i = 0; i < R.length; i++) { const v = R[i] < 0 ? -R[i] : R[i]; if (v > peak) peak = v; }
+    if (peak === 0) return { peak: 0, truePeak: 0, overshoot: 0 };
+    const K = truePeakKernel(), N = K.N, tab = K.table;
+    const thr = peak * 0.6;
+    let tp = peak;
+    const chans = R ? [L, R] : [L];
+    for (const a of chans) {
+      const len = a.length;
+      for (let i = 0; i < len; i++) {
+        const v = a[i] < 0 ? -a[i] : a[i];
+        if (v < thr) continue;
+        for (let ph = 1; ph < TP_OV; ph++) {
+          const off = ph * N;
+          let acc = 0;
+          for (let k = 0; k < N; k++) {
+            let j = i + k - TP_TAPS;
+            if (j < 0) j = 0; else if (j >= len) j = len - 1;
+            acc += a[j] * tab[off + k];
+          }
+          const av = acc < 0 ? -acc : acc;
+          if (av > tp) tp = av;
+        }
+      }
+    }
+    return { peak, truePeak: tp, overshoot: 20 * Math.log10(tp / Math.max(peak, 1e-12)) };
+  }
+
+  /* Scale both channels so the TRUE peak lands on targetDbfs. */
+  function normalizeToTruePeak(L, R, targetDbfs) {
+    const target = Math.pow(10, (targetDbfs === undefined ? -1 : targetDbfs) / 20);
+    const m = truePeak(L, R);
+    if (m.truePeak <= 0) return { gain: 1, peak: 0, truePeak: 0 };
+    const g = target / m.truePeak;
+    for (let i = 0; i < L.length; i++) L[i] *= g;
+    if (R) for (let i = 0; i < R.length; i++) R[i] *= g;
+    return { gain: g, peak: m.peak * g, truePeak: target };
   }
 
   /* =========================================================================
@@ -1340,6 +1538,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
 
   return { TAU, clamp, dbToLin, linToDb, lerp, Biquad, Delay, Reverb, softClip,
            PARAMS, DEFAULTS, PRESETS, PRESET_INFO, GROUPS, SHAPES, Orbit8D, orbitXY, process8D, analyzeOrbit,
+           resampleTime, truePeak, normalizeToTruePeak,
            coLowShelf, coHighShelf, coPeaking, coLowpass };
 });
 </script>
@@ -1356,7 +1555,8 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
   'use strict';
 
   /* engine globals injected by the build (UMD attaches them to globalThis) */
-  const { PARAMS, DEFAULTS, PRESETS, PRESET_INFO, GROUPS, Orbit8D, orbitXY, clamp, dbToLin } = window;
+  const { PARAMS, DEFAULTS, PRESETS, PRESET_INFO, GROUPS, Orbit8D, orbitXY, clamp, dbToLin,
+        resampleTime, normalizeToTruePeak } = window;
 
   const $ = (id) => document.getElementById(id);
   const S = Object.assign({}, DEFAULTS);          // live parameter values
@@ -1494,50 +1694,97 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.S) for (const k in PARAMS) if (typeof d.S[k] === typeof DEFAULTS[k]) S[k] = d.S[k];
-      activePreset = d.activePreset && PRESETS[d.activePreset] ? d.activePreset : null;
+      activePreset = d.activePreset && (PRESETS[d.activePreset] || isMine(d.activePreset)) ? d.activePreset : null;
       if (d.fmtSel) fmtSel = d.fmtSel;
       if (d.brSel) brSel = d.brSel;
       if (d.dpSel) dpSel = d.dpSel;
     } catch (e) {}
   }
+  /* EVERY state change goes through here — a slider, a preset chip, Reset,
+   * Shuffle, anything. Skipping a step is how you get a control that moves but
+   * does nothing: syncAll() re-reads S into the widgets, pushLive() re-reads S
+   * into the running engine, syncSpeed() re-reads S into the live playback rate,
+   * and updateEstimate()/describePreset() refresh the readouts. */
+  function applyState() {
+    syncAll();
+    pushLive(true);
+    syncSpeed();
+    updateEstimate();
+    describePreset();
+    save();
+  }
   function set(key, v, silent) {
     S[key] = v;
     if (!silent) activePreset = null;
-    syncAll();
-    pushLive();
-    updateEstimate();
-    describePreset();
-    save();
+    applyState();
   }
   function applyPreset(name) {
-    const p = PRESETS[name];
+    const p = presetOf(name);
     if (!p) return;
     Object.assign(S, DEFAULTS, p);
     activePreset = name;
-    syncAll();
-    pushLive(true);
-    updateEstimate();
-    describePreset();
-    save();
+    applyState();
   }
 
-  const label = (n) => (PRESET_INFO[n] && PRESET_INFO[n].label) || n;
+  /* ---------------------------------------------------------------- *
+   *  Your own preset: the built-ins are fixed, this one is yours.     *
+   *  One slot, remembered in this browser, shown as a dashed chip.    *
+   * ---------------------------------------------------------------- */
+  const MINE_KEY = 'orbit8d.mine';
+  const MINE_NAME = 'My Preset';
+  let mine = null;                        // { params, saved }
+  function loadMine() {
+    try {
+      const raw = localStorage.getItem(MINE_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d && d.params && typeof d.params === 'object') mine = d;
+    } catch (e) {}
+  }
+  const isMine = (n) => !!mine && n === MINE_NAME;
+  const presetOf = (n) => (isMine(n) ? mine.params : PRESETS[n]);
+  const presetInfo = (n) => (isMine(n)
+    ? { label: MINE_NAME, blurb: 'Your own settings, saved in this browser' }
+    : PRESET_INFO[n]);
+  const label = (n) => (presetInfo(n) && presetInfo(n).label) || n;
+
+  function saveMine() {
+    mine = { params: Object.assign({}, S), saved: Date.now() };
+    try { localStorage.setItem(MINE_KEY, JSON.stringify(mine)); } catch (e) {}
+    activePreset = MINE_NAME;
+    buildPresets();
+    applyState();
+    toast('Saved as ' + MINE_NAME + ' — one click brings it back');
+  }
+  function forgetMine() {
+    mine = null;
+    try { localStorage.removeItem(MINE_KEY); } catch (e) {}
+    if (activePreset === MINE_NAME) activePreset = null;
+    buildPresets();
+    applyState();
+    toast(MINE_NAME + ' removed');
+  }
 
   function buildPresets() {
     const host = $('presets');
     host.innerHTML = '';
-    $('presetHint').textContent = Object.keys(PRESETS).length + ' presets — each one sets every parameter below';
-    Object.keys(PRESETS).forEach((name) => {
+    const names = Object.keys(PRESETS).concat(mine ? [MINE_NAME] : []);
+    $('presetHint').textContent = names.length + ' presets — each one sets every parameter below' +
+      (mine ? ' · yours is saved in this browser' : '');
+    names.forEach((name) => {
       const b = document.createElement('button');
-      b.className = 'pbtn';
+      b.className = 'pbtn' + (isMine(name) ? ' mine' : '');
       b.type = 'button';
       b.dataset.p = name;
       b.textContent = label(name);
-      b.title = (PRESET_INFO[name] && PRESET_INFO[name].blurb) || '';
+      b.title = (presetInfo(name) && presetInfo(name).blurb) || '';
       b.onclick = () => { applyPreset(name); toast(label(name) + ' loaded'); };
       host.appendChild(b);
     });
-    $('resetBtn').onclick = () => { Object.assign(S, DEFAULTS); activePreset = null; syncAll(); pushLive(true); updateEstimate(); save(); toast('Reset to defaults'); };
+    $('saveBtn').onclick = saveMine;
+    $('forgetBtn').style.display = mine ? '' : 'none';
+    $('forgetBtn').onclick = forgetMine;
+    $('resetBtn').onclick = () => { Object.assign(S, DEFAULTS); activePreset = null; applyState(); toast('Reset to defaults'); };
     $('randomBtn').onclick = shuffle;
   }
 
@@ -1547,10 +1794,12 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     const el = $('presetDesc');
     const lap = lapSec();
     const motion = S.sync ? `locked to ${S.bpm} BPM · ${S.beats} beats per lap` : `${lap.toFixed(1)}s per lap`;
-    const meta = `${motion} · shape ${S.shape} · width ${S.width.toFixed(2)} · room ${S.room.toFixed(1)}s · reverb ${Math.round(S.revMix * 100)}%` +
+    const speedTxt = Math.abs((S.speed || 1) - 1) > 1e-4 ? `${S.speed.toFixed(2)}× slow-mo · ` : '';
+    const revTxt = S.reverb ? `${Math.round(S.revMix * 100)}% reverb · ${S.room.toFixed(1)}s room` : 'reverb off';
+    const meta = `${speedTxt}${motion} · shape ${S.shape} · width ${S.width.toFixed(2)} · ${revTxt}` +
                  (S.crossfeed > 0.02 ? ` · crossfeed ${Math.round(S.crossfeed * 100)}%` : '');
-    if (activePreset) {
-      el.innerHTML = `<b>${label(activePreset)}</b> — ${PRESET_INFO[activePreset].blurb}<span class="meta">${meta}</span>`;
+    if (activePreset && presetInfo(activePreset)) {
+      el.innerHTML = `<b>${label(activePreset)}</b> — ${presetInfo(activePreset).blurb}<span class="meta">${meta}</span>`;
     } else {
       el.innerHTML = `<b>Custom</b> — dialled by hand, not from a preset.<span class="meta">${meta}</span>`;
     }
@@ -1578,9 +1827,11 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
       air: r(-4, 5, 0.5),
       crossfeed: Math.random() < 0.4 ? r(0, 0.18, 2) : 0,
       wetLag: r(0, 0.16, 2),
+      speed: Math.random() < 0.35 ? r(0.75, 0.95, 2) : 1,
+      reverb: Math.random() < 0.85,
     });
     activePreset = null;
-    syncAll(); pushLive(true); updateEstimate(); describePreset(); save();
+    applyState();
     toast('Shuffled — save it as a preset if you like it');
   }
 
@@ -1593,7 +1844,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
   let playing = false, startedAt = 0, offsetAt = 0, pos = 0, loopOn = true, bypass = false;
   let liveTheta = 0, liveLaps = 0, lastThetaT = 0;
 
-  const ENGINE_SRC = "/*!\n * dsp.js — the 8D engine (v2)\n * ---------------------------------------------------------------------------\n * One shared DSP core. It runs in three places without modification:\n *   1. Node (CLI)                 — module.exports\n *   2. browser main thread        — attaches to globalThis (offline render + fallback)\n *   3. AudioWorklet global scope  — attaches to globalThis\n *\n * Signal path\n *   in ─┬─ bass shelf ─ air shelf ─┬───────────────────────── dry ──┐\n *       │                          └─ pre-delay ─ Freeverb ─ wet ──┤\n *       │                                                           │\n *       ├─ dry path per ear:  ITD delay → head-shadow LP ×2 → pinna notch\n *       │                     → equal-power pan → \"behind\" cut    ──┤\n *       ├─ wet path:          lagged orbit pan → tail width       ──┤\n *       └──────────────────────────── sum → crossfeed → mono bass ─┴→ gain → limiter\n */\n(function (root, factory) {\n  const api = factory();\n  if (typeof module === 'object' && module.exports) module.exports = api;\n  else for (const k in api) root[k] = api[k];\n})(typeof globalThis !== 'undefined' ? globalThis : self, function () {\n  'use strict';\n\n  const TAU = Math.PI * 2;\n  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);\n  const dbToLin = (db) => Math.pow(10, db / 20);\n  const linToDb = (v) => 20 * Math.log10(Math.max(v, 1e-10));\n  const lerp = (a, b, t) => a + (b - a) * t;\n\n  /* =========================================================================\n   * Parameter table — the single source of truth.\n   * The CLI builds its flags from this, the browser builds its sliders from it.\n   * ========================================================================= */\n  const GROUPS = [\n    { id: 'motion', title: 'Motion',  hint: 'How the sound travels around your head' },\n    { id: 'space',  title: 'Space',   hint: 'Depth, distance and the room' },\n    { id: 'tone',   title: 'Tone',    hint: 'Frequency balance' },\n    { id: 'output', title: 'Output',  hint: 'Level handling' },\n  ];\n\n  const SHAPES = ['circle', 'ellipse', 'figure8', 'pendulum', 'spiral', 'lissajous'];\n\n  const PARAMS = {\n    /* ---- Motion ---- */\n    lap:       { def: 8,     min: 1,    max: 60,  step: 0.1,  label: 'Orbit time',       unit: 's/lap', group: 'motion',\n                 help: 'Seconds for one full lap around your head.' },\n    sync:      { def: false, bool: true, group: 'motion', label: 'Lock orbit to tempo' },\n    bpm:       { def: 120,   min: 40,   max: 220, step: 1,    label: 'Tempo',            unit: 'BPM',   group: 'motion', when: 'sync' },\n    beats:     { def: 4,     min: 1,    max: 16,  step: 1,    label: 'Beats per lap',    unit: 'beats', group: 'motion', when: 'sync' },\n    shape:     { def: 'circle', enum: SHAPES, group: 'motion', label: 'Orbit shape' },\n    width:     { def: 0.9,   min: 0,    max: 1.5, step: 0.01, label: 'Width',            unit: '',      group: 'motion',\n                 help: 'Left/right travel. Above 1.0 the sound passes outside your head.' },\n    depth:     { def: 1.0,   min: 0,    max: 1.5, step: 0.01, label: 'Depth',            unit: '',      group: 'motion',\n                 help: 'Front/back travel. 0 = pure left-right sweep.' },\n    ccw:       { def: false, bool: true, group: 'motion', label: 'Counter-clockwise' },\n    phase:     { def: 0,     min: 0,    max: 1,   step: 0.01, label: 'Start angle',      unit: 'lap',   group: 'motion', adv: true },\n    smooth:    { def: 40,    min: 0,    max: 250, step: 1,    label: 'Motion smoothing', unit: 'ms',    group: 'motion', adv: true,\n                 help: 'Ramps parameter changes so nothing clicks when you drag a slider.' },\n\n    /* ---- Space ---- */\n    hrtf:      { def: true,  bool: true, group: 'space', label: 'Head-shadow + ITD' },\n    swirl:     { def: 0.55,  min: 0,    max: 1,   step: 0.01, label: 'Head shadow',      unit: '',      group: 'space',\n                 help: 'The far ear goes dark as the sound passes it — the strongest \"around me\" cue.' },\n    itd:       { def: 0.6,   min: 0,    max: 1,   step: 0.01, label: 'ITD',              unit: '',      group: 'space',\n                 help: 'Interaural time difference: the far ear hears it up to 0.65 ms late.' },\n    behind:    { def: 4.5,   min: 0,    max: 12,  step: 0.1,  label: 'Behind cut',       unit: 'dB',    group: 'space',\n                 help: 'Drops the level and dulls the tone when the source is behind you.' },\n    elevation: { def: 0,     min: -1,   max: 1,   step: 0.01, label: 'Elevation',        unit: '',      group: 'space',\n                 help: 'Raises or lowers the image using a pinna notch (subtle, headphones only).' },\n    crossfeed: { def: 0,     min: 0,    max: 0.35, step: 0.005, label: 'Crossfeed',      unit: '',      group: 'space', adv: true,\n                 help: 'Leaks each ear into the other with a delay + low-pass. Easier on the ears, less extreme.' },\n    monoBass:  { def: false, bool: true, group: 'space', label: 'Mono bass' },\n    subFreq:   { def: 110,   min: 40,   max: 300, step: 5,    label: 'Mono bass below',  unit: 'Hz',    group: 'space', when: 'monoBass',\n                 help: 'Keeps deep bass centred so the orbit never sounds like it floats away.' },\n    revMix:    { def: 0.35,  min: 0,    max: 1,   step: 0.01, label: 'Reverb mix',       unit: '',      group: 'space' },\n    room:      { def: 2.6,   min: 0.3,  max: 6,   step: 0.1,  label: 'Room',             unit: 's',     group: 'space',\n                 help: 'Reverb decay time (RT60).' },\n    damp:      { def: 0.35,  min: 0,    max: 0.9, step: 0.01, label: 'Tail damping',     unit: '',      group: 'space' },\n    predelay:  { def: 18,    min: 0,    max: 120, step: 1,    label: 'Pre-delay',        unit: 'ms',    group: 'space', adv: true,\n                 help: 'Gap before the reverb starts — a strong distance cue.' },\n    revWidth:  { def: 1.15,  min: 0,    max: 1.5, step: 0.01, label: 'Tail width',       unit: '',      group: 'space', adv: true },\n    wetLag:    { def: 0.08,  min: 0,    max: 0.3, step: 0.01, label: 'Tail lag',         unit: 'lap',   group: 'space', adv: true,\n                 help: 'How far the reverb trails behind the dry sound as it orbits.' },\n\n    /* ---- Tone ---- */\n    bass:      { def: 3,     min: -12,  max: 12,  step: 0.5,  label: 'Bass',             unit: 'dB',    group: 'tone' },\n    air:       { def: 2,     min: -12,  max: 12,  step: 0.5,  label: 'Air',              unit: 'dB',    group: 'tone' },\n\n    /* ---- Output ---- */\n    gain:      { def: 0,     min: -12,  max: 12,  step: 0.5,  label: 'Output trim',      unit: 'dB',    group: 'output' },\n    normalize: { def: true,  bool: true, group: 'output', label: 'Normalize to −0.3 dBFS' },\n    limiter:   { def: true,  bool: true, group: 'output', label: 'Soft limiter' },\n  };\n\n  const DEFAULTS = {};\n  for (const k in PARAMS) DEFAULTS[k] = PARAMS[k].def;\n\n  /* =========================================================================\n   * Presets — each one is a complete parameter set, not a couple of sliders.\n   * ========================================================================= */\n  const PRESETS = {\n    'classic':       { lap: 8,  width: 0.9,  depth: 1,    swirl: 0.55, itd: 0.6,  behind: 4.5, revMix: 0.35, room: 2.6, predelay: 18, bass: 3, air: 2 },\n    'subtle':        { lap: 14, width: 0.55, depth: 0.8,  swirl: 0.35, itd: 0.35, behind: 2.5, revMix: 0.22, room: 1.8, crossfeed: 0.1, bass: 1.5, air: 1 },\n    'wide':          { lap: 10, width: 1.3,  depth: 1.2,  swirl: 0.7,  itd: 0.7,  behind: 5,   revMix: 0.45, room: 3.4, predelay: 26, bass: 4, air: 3 },\n    'intimate':      { lap: 16, width: 0.5,  depth: 0.6,  swirl: 0.4,  itd: 0.45, behind: 3,   revMix: 0.45, room: 1.4, damp: 0.4, predelay: 6, crossfeed: 0.14, bass: 1, air: 3 },\n    'figure-8':      { shape: 'figure8', lap: 7, width: 1.05, depth: 1.2, swirl: 0.62, itd: 0.65, behind: 5, revMix: 0.38, room: 2.8 },\n    'pendulum':      { shape: 'pendulum', lap: 5, width: 1.15, depth: 0.3, swirl: 0.5, itd: 0.55, behind: 3, revMix: 0.3, room: 2.4 },\n    'spiral':        { shape: 'spiral',  lap: 20, width: 1.2, depth: 1.2, swirl: 0.7,  itd: 0.7, behind: 6, revMix: 0.45, room: 3.5, predelay: 30 },\n    'vertigo':       { lap: 2,  width: 1.1,  depth: 1.3,  swirl: 0.8,  itd: 0.8,  behind: 8,   revMix: 0.5,  room: 3,   damp: 0.3, bass: 3, air: 2 },\n    'chaos':         { shape: 'lissajous', lap: 3, width: 1.3, depth: 1.3, swirl: 0.75, itd: 0.75, behind: 7, revMix: 0.4, room: 3.2 },\n    'hall':          { lap: 14, width: 0.85, depth: 0.9,  swirl: 0.5,  itd: 0.5,  behind: 4,   revMix: 0.7,  room: 5.5, damp: 0.5, predelay: 45, crossfeed: 0.12, bass: 2, air: 4 },\n    'cathedral':     { lap: 18, width: 1,    depth: 1.1,  swirl: 0.6,  itd: 0.6,  behind: 4,   revMix: 0.78, room: 6,   damp: 0.45, predelay: 90, revWidth: 1.4, bass: 2, air: 4 },\n    'cave':          { lap: 22, width: 0.8,  depth: 0.9,  swirl: 0.45, itd: 0.5,  behind: 6,   revMix: 0.62, room: 5,   damp: 0.75, predelay: 60, bass: 6, air: -5 },\n    'tunnel':        { shape: 'spiral', lap: 4.5, width: 1.25, depth: 0.8, swirl: 0.75, itd: 0.7, behind: 8, revMix: 0.28, room: 1.5, damp: 0.5, predelay: 8, crossfeed: 0.06, bass: 4, air: 1 },\n    'space':         { lap: 26, width: 1.45, depth: 1.4,  swirl: 0.85, itd: 0.85, behind: 7,   revMix: 0.6,  room: 5,   damp: 0.25, predelay: 50, wetLag: 0.14, bass: 3, air: 4 },\n    'underwater':    { lap: 16, width: 1,    depth: 1.2,  swirl: 0.5,  itd: 0.7,  behind: 9,   revMix: 0.55, room: 4,   damp: 0.8, predelay: 40, bass: 8, air: -10 },\n    'rave':          { lap: 3,  width: 1.35, depth: 1.2,  swirl: 0.8,  itd: 0.75, behind: 6,   revMix: 0.3,  room: 1.8, damp: 0.25, predelay: 10, bass: 5, air: 3 },\n    'sleep':         { lap: 40, width: 0.35, depth: 0.6,  swirl: 0.18, itd: 0.2,  behind: 2,   revMix: 0.4,  room: 4.5, damp: 0.6, predelay: 30, crossfeed: 0.12, bass: 2, air: -4 },\n    'cafe':          { lap: 22, width: 0.6,  depth: 0.7,  swirl: 0.35, itd: 0.4,  behind: 3,   revMix: 0.5,  room: 2.2, damp: 0.6, predelay: 12, crossfeed: 0.2, bass: 2, air: -1 },\n    'lofi':          { lap: 11, width: 0.7,  depth: 0.9,  swirl: 0.3,  itd: 0.3,  behind: 3,   revMix: 0.3,  room: 2.2, damp: 0.7, crossfeed: 0.18, bass: 5, air: -4 },\n    'boombap':       { lap: 6,  width: 0.85, depth: 1,    swirl: 0.3,  itd: 0.35, behind: 3,   revMix: 0.25, room: 1.6, damp: 0.6, bass: 6, air: -1, subFreq: 90 },\n    'headphone-test': { lap: 6, width: 1.5,  depth: 1.5,  swirl: 1,    itd: 1,    behind: 12,  revMix: 0.2,  room: 2,   damp: 0.3, predelay: 5, bass: 0, air: 0 },\n  };\n\n  /* Display metadata. Kept next to the presets so the browser, the CLI and the\n   * README can all name them the same way. */\n  const PRESET_INFO = {\n    'classic':       { label: 'Classic',       blurb: 'The default 8D feel — one lap every 8 seconds' },\n    'subtle':        { label: 'Subtle',        blurb: 'For real listening. Cup of crossfeed, gentle sway' },\n    'wide':          { label: 'Wide',          blurb: 'Pushes past your ears, big room behind it' },\n    'intimate':      { label: 'Intimate',      blurb: 'Small room, close in, warm and dry-ish' },\n    'figure-8':      { label: 'Figure-8',      blurb: 'Sweeps left-right, then behind-through — twice per lap' },\n    'pendulum':      { label: 'Pendulum',      blurb: 'Front-to-back only. No left-right travel at all' },\n    'spiral':        { label: 'Spiral',        blurb: 'Drifts outward and inward as it circles' },\n    'vertigo':       { label: 'Vertigo',       blurb: 'A lap every 2 seconds. Genuinely disorienting' },\n    'chaos':         { label: 'Chaos',         blurb: 'Lissajous path — never repeats the same arc twice' },\n    'hall':          { label: 'Hall',          blurb: 'Long reverb, distant source, plenty of air' },\n    'cathedral':     { label: 'Cathedral',     blurb: 'Six-second tail, huge pre-delay. Enormous' },\n    'cave':          { label: 'Cave',          blurb: 'Dark, damp, boomy — bass pushed up, top rolled off' },\n    'tunnel':        { label: 'Tunnel',        blurb: 'Tight, fast, hollow. Spiral path, almost no reverb' },\n    'space':         { label: 'Space',         blurb: 'Widest setting there is. The room keeps orbiting after' },\n    'underwater':    { label: 'Underwater',    blurb: 'Muffled and slow-moving, everything behind you' },\n    'rave':          { label: 'Rave',          blurb: 'Fast, tight, aggressive. Wears you out in a good way' },\n    'sleep':         { label: 'Sleep',         blurb: 'One lap per 40 seconds, barely there. Very gentle' },\n    'cafe':          { label: 'Café',          blurb: 'Sitting in a room with the band off to one side' },\n    'lofi':          { label: 'Lo-fi',         blurb: 'Fat bottom, rolled-off top, small room' },\n    'boombap':       { label: 'Boom bap',      blurb: 'Hip-hop head-nodder — sub locked centre, slow orbit' },\n    'headphone-test': { label: 'Headphone test', blurb: 'Everything at maximum. Use it to check your cans' },\n  };\n\n  /* =========================================================================\n   * Primitives\n   * ========================================================================= */\n  class Biquad {                                  // single channel state\n    constructor() { this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0; this.x1 = 0; this.x2 = 0; this.y1 = 0; this.y2 = 0; }\n    coefs(c) { this.b0 = c.b0; this.b1 = c.b1; this.b2 = c.b2; this.a1 = c.a1; this.a2 = c.a2; }\n    processW(x, a) {\n      const y = this.y1 + a * (x - this.y1);\n      this.y1 = y;\n      return y;\n    }\n    process(x) {\n      const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;\n      this.x2 = this.x1; this.x1 = x; this.y2 = this.y1; this.y1 = y;\n      return y;\n    }\n    reset() { this.x1 = this.x2 = this.y1 = this.y2 = 0; }\n  }\n\n  // RBJ cookbook coefficients\n  function coLowShelf(fs, f, db, s) {\n    s = s || 0.707;\n    const A = Math.pow(10, db / 40), w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / 2 * Math.sqrt((A + 1 / A) * (1 / s - 1) + 2), tsa = 2 * Math.sqrt(A) * al;\n    const a0 = (A + 1) + (A - 1) * cw + tsa;\n    return { b0: A * ((A + 1) - (A - 1) * cw + tsa) / a0, b1: 2 * A * ((A - 1) - (A + 1) * cw) / a0, b2: A * ((A + 1) - (A - 1) * cw - tsa) / a0,\n             a1: -2 * ((A - 1) + (A + 1) * cw) / a0, a2: ((A + 1) + (A - 1) * cw - tsa) / a0 };\n  }\n  function coHighShelf(fs, f, db, s) {\n    s = s || 0.707;\n    const A = Math.pow(10, db / 40), w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / 2 * Math.sqrt((A + 1 / A) * (1 / s - 1) + 2), tsa = 2 * Math.sqrt(A) * al;\n    const a0 = (A + 1) - (A - 1) * cw + tsa;\n    return { b0: A * ((A + 1) + (A - 1) * cw + tsa) / a0, b1: -2 * A * ((A - 1) + (A + 1) * cw) / a0, b2: A * ((A + 1) + (A - 1) * cw - tsa) / a0,\n             a1: 2 * ((A - 1) - (A + 1) * cw) / a0, a2: ((A + 1) - (A - 1) * cw - tsa) / a0 };\n  }\n  function coPeaking(fs, f, db, q) {\n    const A = Math.pow(10, db / 40), w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / (2 * q), a0 = 1 + al / A;\n    return { b0: (1 + al * A) / a0, b1: -2 * cw / a0, b2: (1 - al * A) / a0, a1: -2 * cw / a0, a2: (1 - al / A) / a0 };\n  }\n  function coLowpass(fs, f, q) {\n    const w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / (2 * (q || 0.707)), a0 = 1 + al;\n    return { b0: (1 - cw) / 2 / a0, b1: (1 - cw) / a0, b2: (1 - cw) / 2 / a0, a1: -2 * cw / a0, a2: (1 - al) / a0 };\n  }\n\n  class Delay {                                    // fractional read, integer write\n    constructor(max) { this.n = Math.max(4, max | 0); this.buf = new Float32Array(this.n); this.i = 0; }\n    write(x) { this.buf[this.i] = x; if (++this.i >= this.n) this.i = 0; }\n    /* read(d) = the sample written exactly d frames ago (0 = the current one).\n     * this.i points at the next write slot, so the newest sample sits at i-1. */\n    read(d) {\n      let p = this.i - 1 - d;\n      while (p < 0) p += this.n;\n      const i = p | 0, f = p - i, j = i + 1 >= this.n ? 0 : i + 1;\n      return this.buf[i] * (1 - f) + this.buf[j] * f;\n    }\n    clear() { this.buf.fill(0); }\n  }\n\n  class Comb {\n    constructor(len) { this.n = len; this.buf = new Float32Array(len); this.i = 0; this.fb = 0.9; this.damp = 0.3; this.store = 0; }\n    process(x) {\n      const y = this.buf[this.i];\n      this.store = y * (1 - this.damp) + this.store * this.damp;\n      this.buf[this.i] = x + this.store * this.fb;\n      if (++this.i >= this.n) this.i = 0;\n      return y;\n    }\n  }\n  class Allpass {\n    constructor(len) { this.n = len; this.buf = new Float32Array(len); this.i = 0; }\n    process(x) {\n      const y = this.buf[this.i], o = -x + y;\n      this.buf[this.i] = x + y * 0.5;\n      if (++this.i >= this.n) this.i = 0;\n      return o;\n    }\n  }\n\n  /* Freeverb: 8 combs + 4 allpasses per channel, right side detuned by +23 samples.\n   * Comb feedback is derived from the RT60 target so the \"Room\" slider is in real seconds. */\n  class Reverb {\n    constructor(fs) {\n      this.fs = fs;\n      const k = fs / 44100;\n      const C = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];\n      const A = [556, 441, 341, 225];\n      const sp = Math.round(23 * k);\n      this.cl = C.map((n) => new Comb(Math.round(n * k) + 8));\n      this.cr = C.map((n) => new Comb(Math.round(n * k) + sp + 8));\n      this.al = A.map((n) => new Allpass(Math.round(n * k) + 4));\n      this.ar = A.map((n) => new Allpass(Math.round(n * k) + sp + 4));\n      this.wetL = 0; this.wetR = 0; this.fixedGain = 0.015;\n      this.set(2.6, 0.35);\n    }\n    set(rt60, damp) {\n      const fs = this.fs;\n      for (const c of this.cl) c.fb = Math.pow(10, -3 * c.n / (rt60 * fs));\n      for (const c of this.cr) c.fb = Math.pow(10, -3 * c.n / (rt60 * fs));\n      for (const c of this.cl) c.damp = damp;\n      for (const c of this.cr) c.damp = damp;\n    }\n    process(l, r) {\n      let a = 0, b = 0;\n      for (let i = 0; i < 8; i++) { a += this.cl[i].process(l); b += this.cr[i].process(r); }\n      for (let i = 0; i < 4; i++) { a = this.al[i].process(a); b = this.ar[i].process(b); }\n      this.wetL = a; this.wetR = b;\n    }\n    clear() { for (const c of this.cl) { c.buf.fill(0); c.store = 0; } for (const c of this.cr) { c.buf.fill(0); c.store = 0; }\n              for (const c of this.al) c.buf.fill(0); for (const c of this.ar) c.buf.fill(0); }\n  }\n\n  /* Linear-phase-free soft clip: perfectly linear below the threshold, then a smooth knee. */\n  function softClip(x, t) {\n    const a = x < 0 ? -x : x;\n    if (a <= t) return x;\n    const s = x < 0 ? -1 : 1;\n    return s * (t + (1 - t) * Math.tanh((a - t) / (1 - t)));\n  }\n\n  /* =========================================================================\n   * Orbit geometry — shared by the engine and the UI canvas.\n   * Writes into a module-level scratch object so the per-sample loop never allocates.\n   * ========================================================================= */\n  const _xy = { x: 0, y: 0 };\n  function orbitXY(t, shape) {\n    switch (shape) {\n      case 'ellipse':   _xy.x = Math.sin(t); _xy.y = Math.cos(t) * 0.35; break;\n      case 'figure8':   _xy.x = Math.sin(t); _xy.y = Math.sin(2 * t) * 0.6; break;\n      case 'pendulum':  _xy.x = Math.sin(t); _xy.y = Math.cos(t) * 0.15; break;\n      case 'spiral': {  const r = 0.5 + 0.5 * Math.abs(Math.sin(t / 2));\n                        _xy.x = Math.sin(t) * r; _xy.y = Math.cos(t) * r; break; }\n      case 'lissajous': _xy.x = Math.sin(3 * t); _xy.y = Math.cos(2 * t); break;\n      default:          _xy.x = Math.sin(t); _xy.y = Math.cos(t);\n    }\n    return _xy;\n  }\n\n  /* =========================================================================\n   * The engine\n   * ========================================================================= */\n  const BLOCK = 128;\n\n  class Orbit8D {\n    constructor(sampleRate, params) {\n      this.fs = sampleRate || 44100;\n      this.version = 2;\n      this.p = Object.assign({}, DEFAULTS, params || {});\n      this.s = Object.assign({}, DEFAULTS);          // smoothed values\n      this.theta = 0; this.laps = 0;\n      this.peak = 0; this.clipped = 0;\n\n      this.bassF = [new Biquad(), new Biquad()];\n      this.airF = [new Biquad(), new Biquad()];\n      this.notch = [new Biquad(), new Biquad()];\n      this.shadow = [new Biquad(), new Biquad()];     // 1-pole head shadow, per ear (cascaded twice)\n      this.shadow2 = [new Biquad(), new Biquad()];\n      this.xfLP = [new Biquad(), new Biquad()];\n      this.monoLP = [new Biquad(), new Biquad()];\n      this.monoLP2 = [new Biquad(), new Biquad()];\n\n      const maxItd = Math.ceil(0.0007 * this.fs) + 4;  // 0.7 ms\n      this.itdL = new Delay(maxItd + 8);\n      this.itdR = new Delay(maxItd + 8);\n      this.xfD = [new Delay(Math.ceil(0.0004 * this.fs) + 4), new Delay(Math.ceil(0.0004 * this.fs) + 4)];\n      this.pre = [new Delay(Math.ceil(0.13 * this.fs)), new Delay(Math.ceil(0.13 * this.fs))];\n      this.verb = new Reverb(this.fs);\n      this.maxItd = 0.00065 * this.fs;\n\n      this._apply(true);\n    }\n\n    /* Merge new parameters. Only the keys present are changed, so the UI can\n     * push a single slider without disturbing anything else. */\n    setParams(params) {\n      for (const k in params) if (params[k] !== undefined && params[k] !== null) this.p[k] = params[k];\n    }\n    reset() {\n      for (const f of [this.bassF, this.airF, this.notch, this.shadow, this.shadow2, this.xfLP, this.monoLP, this.monoLP2])\n        for (const b of f) b.reset();\n      this.itdL.clear(); this.itdR.clear();\n      for (const d of this.xfD) d.clear();\n      for (const d of this.pre) d.clear();\n      this.verb.clear();\n      this.theta = 0; this.peak = 0; this.clipped = 0;\n    }\n\n    /* Smooth + derive coefficients. Called once per 128-frame sub-block. */\n    _apply(force) {\n      const p = this.p, s = this.s, fs = this.fs;\n      const tau = Math.max(0.004, (p.smooth | 0) / 1000);\n      const a = force ? 1 : 1 - Math.exp(-BLOCK / (fs * tau));\n      const keys = ['lap', 'width', 'depth', 'swirl', 'itd', 'behind', 'elevation', 'crossfeed',\n                    'revMix', 'room', 'damp', 'predelay', 'revWidth', 'wetLag', 'bass', 'air', 'gain', 'subFreq'];\n      for (const k of keys) s[k] = force ? p[k] : s[k] + (p[k] - s[k]) * a;\n      for (const k of ['shape', 'ccw', 'sync', 'bpm', 'beats', 'hrtf', 'monoBass', 'normalize', 'limiter', 'phase'])\n        s[k] = p[k];\n\n      this.bassF[0].coefs(coLowShelf(fs, 180, s.bass));  this.bassF[1].coefs(coLowShelf(fs, 180, s.bass));\n      this.airF[0].coefs(coHighShelf(fs, 6000, s.air));  this.airF[1].coefs(coHighShelf(fs, 6000, s.air));\n      this.verb.set(s.room, s.damp);\n\n      // elevation → pinna notch. Unity at 0, so centring it costs nothing.\n      this.useNotch = Math.abs(s.elevation) > 0.02;\n      const nf = clamp(lerp(10200, 6800, (s.elevation + 1) / 2), 4000, 14000);\n      const nc = coPeaking(fs, nf, this.useNotch ? -8 * Math.abs(s.elevation) : 0, 1.2);\n      this.notch[0].coefs(nc); this.notch[1].coefs(nc);\n\n      // crossfeed low-pass (~700 Hz) + mono-bass low-pass (12 dB/oct)\n      const xc = coLowpass(fs, 700, 0.707);\n      this.xfLP[0].coefs(xc); this.xfLP[1].coefs(xc);\n      const sub = clamp(s.subFreq, 40, 300);\n      const w = TAU * sub / fs, c = Math.exp(-w);\n      this.monoLP[0].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n      this.monoLP[1].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n      this.monoLP2[0].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n      this.monoLP2[1].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n\n      // per-orbit rate in radians per sample\n      const lapSec = s.sync ? (60 / s.bpm) * s.beats : s.lap;\n      this.dTheta = TAU / (Math.max(0.05, lapSec) * fs) * (s.ccw ? -1 : 1);\n      if (force) this.theta = (s.phase || 0) * TAU;\n      this.gg = dbToLin(s.gain);\n      this.behindG = dbToLin(-s.behind);\n      this.xfAmt = s.crossfeed;\n      this.wetGain = s.revMix;                       // straight dry/wet balance\n      this.wetLagRad = s.wetLag * TAU;\n      this.itdAmp = s.itd * this.maxItd;\n      this.useHRTF = s.hrtf !== false;\n      this.preSamp = Math.round(clamp(s.predelay, 0, 120) / 1000 * fs);\n    }\n\n    /* Process n frames in place. Internally split into 128-frame sub-blocks. */\n    processBlock(L, R, n) {\n      for (let off = 0; off < n; off += BLOCK) {\n        const count = Math.min(BLOCK, n - off);\n        this._apply(false);\n        this._run(L, R, off, count);\n      }\n      return this;\n    }\n\n    _run(L, R, off, count) {\n      const p = this.p, s = this.s, fs = this.fs;\n      const itdL = this.itdL, itdR = this.itdR;\n      const FMIN = 3200, FMAX = 19000;   // far ear keeps the low end, loses the top\n      const sh0L = this.shadow[0], sh0R = this.shadow[1], sh1L = this.shadow2[0], sh1R = this.shadow2[1];\n      const ntcL = this.notch[0], ntcR = this.notch[1];\n      const b0 = this.bassF[0], b1 = this.bassF[1], a0 = this.airF[0], a1 = this.airF[1];\n      const preL = this.pre[0], preR = this.pre[1];\n      const k2pi_fs = TAU / fs;\n      let theta = this.theta, peak = this.peak, clipped = this.clipped;\n      const t = this;\n\n      for (let i = 0; i < count; i++) {\n        const inL = L[off + i], inR = R[off + i];\n\n        /* --- orbit position --- */\n        theta += t.dTheta;\n        if (theta >= TAU) { theta -= TAU; t.laps++; }\n        else if (theta <= -TAU) { theta += TAU; t.laps--; }\n        const xy = orbitXY(theta, s.shape);\n        const xr = xy.x, yr = xy.y;\n        const x = clamp(xr * s.width, -1.5, 1.5) * (s.ccw ? -1 : 1);   // mirrored for readability\n        const y = clamp(yr * s.depth, -1.5, 1.5);\n\n        /* --- tone (stereo, linked coefficients) --- */\n        let l = a0.process(b0.process(inL));\n        let r = a1.process(b1.process(inR));\n\n        /* --- head cues on the dry path --- */\n        const xc = clamp(x, -1, 1);\n        const ang = (xc + 1) * 0.25 * Math.PI;            // equal power, matches Web Audio StereoPanner\n        const gL = 0.06 + 0.94 * Math.cos(ang);           // 0.06 floor: a hard-muted ear sounds broken\n        const gR = 0.06 + 0.94 * Math.sin(ang);\n\n        const openL = (1 - xc) / 2, openR = (1 + xc) / 2; // 1 = that ear faces the source\n        const behind = clamp((1 - y) / 2, 0, 1);\n        const hr = t.useHRTF ? 1 : 0;\n\n        let cL = FMAX * Math.pow(FMIN / FMAX, (1 - openL) * s.swirl * hr);\n        let cR = FMAX * Math.pow(FMIN / FMAX, (1 - openR) * s.swirl * hr);\n        const bdamp = 1 - 0.55 * behind * hr;\n        cL = clamp(cL * bdamp, 200, FMAX);\n        cR = clamp(cR * bdamp, 200, FMAX);\n        const kaL = 1 - Math.exp(-k2pi_fs * cL);\n        const kaR = 1 - Math.exp(-k2pi_fs * cR);\n        const bg = 1 + (t.behindG - 1) * behind * hr;\n\n        // ITD: the ear facing away hears it late\n        itdL.write(l); itdR.write(r);\n        let dl = itdL.read(t.itdAmp * openR * hr);\n        let dr = itdR.read(t.itdAmp * openL * hr);\n\n        // head shadow: two cascaded 1-poles ≈ 12 dB/oct of occlusion\n        dl = sh1L.processW(sh0L.processW(dl, kaL), kaL);\n        dr = sh1R.processW(sh0R.processW(dr, kaR), kaR);\n        // pinna notch (elevation) — only when it's doing something\n        if (t.useNotch) { dl = ntcL.process(dl); dr = ntcR.process(dr); }\n\n        let outL = dl * gL * bg;\n        let outR = dr * gR * bg;\n\n        /* --- wet path --- */\n        /* Freeverb's 0.015 input scaling already lands the wet near unity;\n         * the dry/wet balance is the revMix control's job, not a hidden fudge. */\n        preL.write(l * t.verb.fixedGain);\n        preR.write(r * t.verb.fixedGain);\n        t.verb.process(preL.read(t.preSamp), preR.read(t.preSamp));\n\n        let vl = t.verb.wetL, vr = t.verb.wetR;\n        const mid = (vl + vr) * 0.5, side = (vl - vr) * 0.5 * s.revWidth;\n        vl = mid + side; vr = mid - side;\n\n        const xyW = orbitXY(theta - t.wetLagRad, s.shape);\n        const xw = clamp(xyW.x * s.width * 1.15, -1.5, 1.5);\n        const angW = (clamp(xw, -1, 1) + 1) * 0.25 * Math.PI;\n        const wgL = 0.04 + 0.96 * Math.cos(angW);\n        const wgR = 0.04 + 0.96 * Math.sin(angW);\n        outL += vl * wgL * t.wetGain;\n        outR += vr * wgR * t.wetGain;\n\n        /* --- crossfeed --- */\n        if (t.xfAmt > 0) {\n          const d0 = t.xfD[0], d1 = t.xfD[1];\n          d0.write(outR); d1.write(outL);\n          const xs = Math.round(0.0003 * fs);\n          outL += t.xfAmt * t.xfLP[0].process(d0.read(xs));\n          outR += t.xfAmt * t.xfLP[1].process(d1.read(xs));\n        }\n\n        /* --- mono bass --- */\n        if (s.monoBass) {\n          const loL = t.monoLP2[0].process(t.monoLP[0].process(outL));\n          const loR = t.monoLP2[1].process(t.monoLP[1].process(outR));\n          const loM = (loL + loR) * 0.5;\n          outL = (outL - loL) + loM;\n          outR = (outR - loR) + loM;\n        }\n\n        /* --- trim + limiter --- */\n        let oL = outL * t.gg, oR = outR * t.gg;\n        if (s.limiter) { oL = softClip(oL, 0.72); oR = softClip(oR, 0.72); }\n        if (oL > 1 || oL < -1 || oR > 1 || oR < -1) clipped++;\n        const aL = oL < 0 ? -oL : oL; if (aL > peak) peak = aL;\n        const aR = oR < 0 ? -oR : oR; if (aR > peak) peak = aR;\n\n        L[off + i] = oL; R[off + i] = oR;\n      }\n      this.theta = theta; this.peak = peak; this.clipped = clipped;\n    }\n  }\n\n  /* =========================================================================\n   * Buffered convenience wrapper (used by the CLI and the browser renderer)\n   * ========================================================================= */\n  function process8D(L, R, sampleRate, params, onProgress) {\n    const eng = new Orbit8D(sampleRate, params);\n    const n = L.length;\n    const total = Math.ceil(n / 65536);\n    for (let off = 0, blk = 0; off < n; off += 65536, blk++) {\n      const count = Math.min(65536, n - off);\n      eng.processBlock(L.subarray(off, off + count), R.subarray(off, off + count), count);\n      if (onProgress) onProgress((blk + 1) / total);\n    }\n    return eng;\n  }\n\n  /* Measures how much the stereo image actually moves. */\n  function analyzeOrbit(L, R, fs) {\n    const win = Math.max(64, Math.round(fs * 0.05));\n    const pans = [];\n    let sLL = 0, sRR = 0, sLR = 0, pkL = 0, pkR = 0;\n    for (let st = 0; st + win <= L.length; st += win) {\n      let sl = 0, sr = 0, slr = 0;\n      for (let i = st; i < st + win; i++) {\n        const a = L[i], b = R[i];\n        sl += a * a; sr += b * b; slr += a * b;\n        const al = a < 0 ? -a : a, ar = b < 0 ? -b : b;\n        if (al > pkL) pkL = al; if (ar > pkR) pkR = ar;\n      }\n      sLL += sl; sRR += sr; sLR += slr;\n      const rl = Math.sqrt(sl / win), rr = Math.sqrt(sr / win), tot = rl + rr;\n      if (tot > 1e-5) pans.push((rr - rl) / tot);\n    }\n    pans.sort((a, b) => a - b);\n    const q = (f) => (pans.length ? pans[Math.min(pans.length - 1, Math.max(0, Math.floor(f * pans.length)))] : 0);\n    return {\n      swing: q(0.95) - q(0.05), panMin: q(0.05), panMax: q(0.95), panMid: q(0.5),\n      corr: sLR / Math.sqrt((sLL || 1e-12) * (sRR || 1e-12)),\n      rmsL: Math.sqrt(sLL / Math.max(1, L.length)), rmsR: Math.sqrt(sRR / Math.max(1, R.length)),\n      peakL: pkL, peakR: pkR, windows: pans.length,\n    };\n  }\n\n  return { TAU, clamp, dbToLin, linToDb, lerp, Biquad, Delay, Reverb, softClip,\n           PARAMS, DEFAULTS, PRESETS, PRESET_INFO, GROUPS, SHAPES, Orbit8D, orbitXY, process8D, analyzeOrbit,\n           coLowShelf, coHighShelf, coPeaking, coLowpass };\n});\n";
+  const ENGINE_SRC = "/*!\n * dsp.js — the 8D engine (v2)\n * ---------------------------------------------------------------------------\n * One shared DSP core. It runs in three places without modification:\n *   1. Node (CLI)                 — module.exports\n *   2. browser main thread        — attaches to globalThis (offline render + fallback)\n *   3. AudioWorklet global scope  — attaches to globalThis\n *\n * Signal path\n *   in ─┬─ bass shelf ─ air shelf ─┬───────────────────────── dry ──┐\n *       │                          └─ pre-delay ─ Freeverb ─ wet ──┤\n *       │                                                           │\n *       ├─ dry path per ear:  ITD delay → head-shadow LP ×2 → pinna notch\n *       │                     → equal-power pan → \"behind\" cut    ──┤\n *       ├─ wet path:          lagged orbit pan → tail width       ──┤\n *       └──────────────────────────── sum → crossfeed → mono bass ─┴→ gain → limiter\n */\n(function (root, factory) {\n  const api = factory();\n  if (typeof module === 'object' && module.exports) module.exports = api;\n  else for (const k in api) root[k] = api[k];\n})(typeof globalThis !== 'undefined' ? globalThis : self, function () {\n  'use strict';\n\n  const TAU = Math.PI * 2;\n  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);\n  const dbToLin = (db) => Math.pow(10, db / 20);\n  const linToDb = (v) => 20 * Math.log10(Math.max(v, 1e-10));\n  const lerp = (a, b, t) => a + (b - a) * t;\n\n  /* =========================================================================\n   * Parameter table — the single source of truth.\n   * The CLI builds its flags from this, the browser builds its sliders from it.\n   * ========================================================================= */\n  const GROUPS = [\n    { id: 'feel',   title: 'Feel',    hint: 'The whole song, before any 8D processing' },\n    { id: 'motion', title: 'Motion',  hint: 'How the sound travels around your head' },\n    { id: 'space',  title: 'Space',   hint: 'Depth, distance and the room' },\n    { id: 'tone',   title: 'Tone',    hint: 'Frequency balance' },\n    { id: 'output', title: 'Output',  hint: 'Level handling' },\n  ];\n\n  const SHAPES = ['circle', 'ellipse', 'figure8', 'pendulum', 'spiral', 'lissajous'];\n\n  const PARAMS = {\n    /* ---- Feel ---- */\n    speed:     { def: 1,     min: 0.5,  max: 1.5, step: 0.01, label: 'Speed (slow-mo)', unit: '\\u00d7', group: 'feel',\n                 help: 'Below 1.00 slows the song down and drops the pitch \\u2014 the classic \"slowed\" sound. Above 1.00 speeds it up. The Slowed presets use 0.92. Orbit timing is unaffected. Want your own rate? Drag it, then Save preset.' },\n\n    /* ---- Motion ---- */\n    lap:       { def: 8,     min: 1,    max: 60,  step: 0.1,  label: 'Orbit time',       unit: 's/lap', group: 'motion',\n                 help: 'Seconds for one full lap around your head.' },\n    sync:      { def: false, bool: true, group: 'motion', label: 'Lock orbit to tempo' },\n    bpm:       { def: 120,   min: 40,   max: 220, step: 1,    label: 'Tempo',            unit: 'BPM',   group: 'motion', when: 'sync' },\n    beats:     { def: 4,     min: 1,    max: 16,  step: 1,    label: 'Beats per lap',    unit: 'beats', group: 'motion', when: 'sync' },\n    shape:     { def: 'circle', enum: SHAPES, group: 'motion', label: 'Orbit shape' },\n    width:     { def: 0.9,   min: 0,    max: 1.5, step: 0.01, label: 'Width',            unit: '',      group: 'motion',\n                 help: 'Left/right travel. Above 1.0 the sound passes outside your head.' },\n    depth:     { def: 1.0,   min: 0,    max: 1.5, step: 0.01, label: 'Depth',            unit: '',      group: 'motion',\n                 help: 'Front/back travel. 0 = pure left-right sweep.' },\n    ccw:       { def: false, bool: true, group: 'motion', label: 'Counter-clockwise' },\n    phase:     { def: 0,     min: 0,    max: 1,   step: 0.01, label: 'Start angle',      unit: 'lap',   group: 'motion', adv: true },\n    smooth:    { def: 40,    min: 0,    max: 250, step: 1,    label: 'Motion smoothing', unit: 'ms',    group: 'motion', adv: true,\n                 help: 'Ramps parameter changes so nothing clicks when you drag a slider.' },\n\n    /* ---- Space ---- */\n    hrtf:      { def: true,  bool: true, group: 'space', label: 'Head-shadow + ITD' },\n    swirl:     { def: 0.55,  min: 0,    max: 1,   step: 0.01, label: 'Head shadow',      unit: '',      group: 'space',\n                 help: 'The far ear goes dark as the sound passes it — the strongest \"around me\" cue.' },\n    itd:       { def: 0.6,   min: 0,    max: 1,   step: 0.01, label: 'ITD',              unit: '',      group: 'space',\n                 help: 'Interaural time difference: the far ear hears it up to 0.65 ms late.' },\n    behind:    { def: 4.5,   min: 0,    max: 12,  step: 0.1,  label: 'Behind cut',       unit: 'dB',    group: 'space',\n                 help: 'Drops the level and dulls the tone when the source is behind you.' },\n    elevation: { def: 0,     min: -1,   max: 1,   step: 0.01, label: 'Elevation',        unit: '',      group: 'space',\n                 help: 'Raises or lowers the image using a pinna notch (subtle, headphones only).' },\n    crossfeed: { def: 0,     min: 0,    max: 0.35, step: 0.005, label: 'Crossfeed',      unit: '',      group: 'space', adv: true,\n                 help: 'Leaks each ear into the other with a delay + low-pass. Easier on the ears, less extreme.' },\n    monoBass:  { def: false, bool: true, group: 'space', label: 'Mono bass' },\n    subFreq:   { def: 110,   min: 40,   max: 300, step: 5,    label: 'Mono bass below',  unit: 'Hz',    group: 'space', when: 'monoBass',\n                 help: 'Keeps deep bass centred so the orbit never sounds like it floats away.' },\n    reverb:    { def: true,  bool: true, group: 'space', label: 'Reverb' },\n    revMix:    { def: 0.35,  min: 0,    max: 1,   step: 0.01, label: 'Reverb mix',       unit: '',      group: 'space', when: 'reverb' },\n    room:      { def: 2.6,   min: 0.3,  max: 6,   step: 0.1,  label: 'Room',             unit: 's',     group: 'space', when: 'reverb',\n                 help: 'Reverb decay time (RT60).' },\n    damp:      { def: 0.35,  min: 0,    max: 0.9, step: 0.01, label: 'Tail damping',     unit: '',      group: 'space', when: 'reverb' },\n    predelay:  { def: 18,    min: 0,    max: 120, step: 1,    label: 'Pre-delay',        unit: 'ms',    group: 'space', when: 'reverb', adv: true,\n                 help: 'Gap before the reverb starts — a strong distance cue.' },\n    revWidth:  { def: 1.15,  min: 0,    max: 1.5, step: 0.01, label: 'Tail width',       unit: '',      group: 'space', when: 'reverb', adv: true },\n    wetLag:    { def: 0.08,  min: 0,    max: 0.3, step: 0.01, label: 'Tail lag',         unit: 'lap',   group: 'space', when: 'reverb', adv: true,\n                 help: 'How far the reverb trails behind the dry sound as it orbits.' },\n\n    /* ---- Tone ---- */\n    bass:      { def: 3,     min: -12,  max: 12,  step: 0.5,  label: 'Bass',             unit: 'dB',    group: 'tone' },\n    air:       { def: 2,     min: -12,  max: 12,  step: 0.5,  label: 'Air',              unit: 'dB',    group: 'tone' },\n\n    /* ---- Output ---- */\n    gain:      { def: 0,     min: -12,  max: 12,  step: 0.5,  label: 'Output trim',      unit: 'dB',    group: 'output' },\n    normalize: { def: true,  bool: true, group: 'output', label: 'Normalize (−1 dBFS peak)' },\n    limiter:   { def: true,  bool: true, group: 'output', label: 'Soft limiter' },\n  };\n\n  const DEFAULTS = {};\n  for (const k in PARAMS) DEFAULTS[k] = PARAMS[k].def;\n\n  /* =========================================================================\n   * Presets — each one is a complete parameter set, not a couple of sliders.\n   * ========================================================================= */\n  const PRESETS = {\n    'classic':       { lap: 8,  width: 0.9,  depth: 1,    swirl: 0.55, itd: 0.6,  behind: 4.5, revMix: 0.35, room: 2.6, predelay: 18, bass: 3, air: 2 },\n    'subtle':        { lap: 14, width: 0.55, depth: 0.8,  swirl: 0.35, itd: 0.35, behind: 2.5, revMix: 0.22, room: 1.8, crossfeed: 0.1, bass: 1.5, air: 1 },\n    'wide':          { lap: 10, width: 1.3,  depth: 1.2,  swirl: 0.7,  itd: 0.7,  behind: 5,   revMix: 0.45, room: 3.4, predelay: 26, bass: 4, air: 3 },\n    'intimate':      { lap: 16, width: 0.5,  depth: 0.6,  swirl: 0.4,  itd: 0.45, behind: 3,   revMix: 0.45, room: 1.4, damp: 0.4, predelay: 6, crossfeed: 0.14, bass: 1, air: 3 },\n    'figure-8':      { shape: 'figure8', lap: 7, width: 1.05, depth: 1.2, swirl: 0.62, itd: 0.65, behind: 5, revMix: 0.38, room: 2.8 },\n    'pendulum':      { shape: 'pendulum', lap: 5, width: 1.15, depth: 0.3, swirl: 0.5, itd: 0.55, behind: 3, revMix: 0.3, room: 2.4 },\n    'spiral':        { shape: 'spiral',  lap: 20, width: 1.2, depth: 1.2, swirl: 0.7,  itd: 0.7, behind: 6, revMix: 0.45, room: 3.5, predelay: 30 },\n    'vertigo':       { lap: 2,  width: 1.1,  depth: 1.3,  swirl: 0.8,  itd: 0.8,  behind: 8,   revMix: 0.5,  room: 3,   damp: 0.3, bass: 3, air: 2 },\n    'chaos':         { shape: 'lissajous', lap: 3, width: 1.3, depth: 1.3, swirl: 0.75, itd: 0.75, behind: 7, revMix: 0.4, room: 3.2 },\n    'hall':          { lap: 14, width: 0.85, depth: 0.9,  swirl: 0.5,  itd: 0.5,  behind: 4,   revMix: 0.7,  room: 5.5, damp: 0.5, predelay: 45, crossfeed: 0.12, bass: 2, air: 4 },\n    'cathedral':     { lap: 18, width: 1,    depth: 1.1,  swirl: 0.6,  itd: 0.6,  behind: 4,   revMix: 0.78, room: 6,   damp: 0.45, predelay: 90, revWidth: 1.4, bass: 2, air: 4 },\n    'cave':          { lap: 22, width: 0.8,  depth: 0.9,  swirl: 0.45, itd: 0.5,  behind: 6,   revMix: 0.62, room: 5,   damp: 0.75, predelay: 60, bass: 6, air: -5 },\n    'tunnel':        { shape: 'spiral', lap: 4.5, width: 1.25, depth: 0.8, swirl: 0.75, itd: 0.7, behind: 8, revMix: 0.28, room: 1.5, damp: 0.5, predelay: 8, crossfeed: 0.06, bass: 4, air: 1 },\n    'space':         { lap: 26, width: 1.45, depth: 1.4,  swirl: 0.85, itd: 0.85, behind: 7,   revMix: 0.6,  room: 5,   damp: 0.25, predelay: 50, wetLag: 0.14, bass: 3, air: 4 },\n    'underwater':    { lap: 16, width: 1,    depth: 1.2,  swirl: 0.5,  itd: 0.7,  behind: 9,   revMix: 0.55, room: 4,   damp: 0.8, predelay: 40, bass: 8, air: -10 },\n    'rave':          { lap: 3,  width: 1.35, depth: 1.2,  swirl: 0.8,  itd: 0.75, behind: 6,   revMix: 0.3,  room: 1.8, damp: 0.25, predelay: 10, bass: 5, air: 3 },\n    'sleep':         { lap: 40, width: 0.35, depth: 0.6,  swirl: 0.18, itd: 0.2,  behind: 2,   revMix: 0.4,  room: 4.5, damp: 0.6, predelay: 30, crossfeed: 0.12, bass: 2, air: -4 },\n    'cafe':          { lap: 22, width: 0.6,  depth: 0.7,  swirl: 0.35, itd: 0.4,  behind: 3,   revMix: 0.5,  room: 2.2, damp: 0.6, predelay: 12, crossfeed: 0.2, bass: 2, air: -1 },\n    'slowed':        { speed: 0.92, lap: 14, width: 0.75, depth: 0.9,  swirl: 0.45, itd: 0.5,  behind: 4,   reverb: false, revMix: 0, bass: 5, air: 1 },\n    'reverb':        { speed: 1,    lap: 9,  width: 0.9,  depth: 1,    swirl: 0.6,  itd: 0.6,  behind: 4.5, revMix: 0.75, room: 5, damp: 0.45, predelay: 55, revWidth: 1.3, bass: 2, air: 4 },\n    'slowed-reverb': { speed: 0.92, lap: 12, width: 0.85, depth: 1,    swirl: 0.5,  itd: 0.55, behind: 5,   revMix: 0.55, room: 4.5, damp: 0.5, predelay: 35, bass: 4, air: 1 },\n    'nightcore':     { speed: 1.3,  lap: 6,  width: 0.95, depth: 1,    swirl: 0.6,  itd: 0.6,  behind: 4,   revMix: 0.25, room: 2.2, damp: 0.35, predelay: 10, bass: 1, air: 4 },\n    'lofi':          { lap: 11, width: 0.7,  depth: 0.9,  swirl: 0.3,  itd: 0.3,  behind: 3,   revMix: 0.3,  room: 2.2, damp: 0.7, crossfeed: 0.18, bass: 5, air: -4 },\n    'boombap':       { lap: 6,  width: 0.85, depth: 1,    swirl: 0.3,  itd: 0.35, behind: 3,   revMix: 0.25, room: 1.6, damp: 0.6, bass: 6, air: -1, subFreq: 90 },\n    'headphone-test': { lap: 6, width: 1.5,  depth: 1.5,  swirl: 1,    itd: 1,    behind: 12,  revMix: 0.2,  room: 2,   damp: 0.3, predelay: 5, bass: 0, air: 0 },\n  };\n\n  /* Display metadata. Kept next to the presets so the browser, the CLI and the\n   * README can all name them the same way. */\n  const PRESET_INFO = {\n    'classic':       { label: 'Classic',       blurb: 'The default 8D feel — one lap every 8 seconds' },\n    'subtle':        { label: 'Subtle',        blurb: 'For real listening. Cup of crossfeed, gentle sway' },\n    'wide':          { label: 'Wide',          blurb: 'Pushes past your ears, big room behind it' },\n    'intimate':      { label: 'Intimate',      blurb: 'Small room, close in, warm and dry-ish' },\n    'figure-8':      { label: 'Figure-8',      blurb: 'Sweeps left-right, then behind-through — twice per lap' },\n    'pendulum':      { label: 'Pendulum',      blurb: 'Front-to-back only. No left-right travel at all' },\n    'spiral':        { label: 'Spiral',        blurb: 'Drifts outward and inward as it circles' },\n    'vertigo':       { label: 'Vertigo',       blurb: 'A lap every 2 seconds. Genuinely disorienting' },\n    'chaos':         { label: 'Chaos',         blurb: 'Lissajous path — never repeats the same arc twice' },\n    'hall':          { label: 'Hall',          blurb: 'Long reverb, distant source, plenty of air' },\n    'cathedral':     { label: 'Cathedral',     blurb: 'Six-second tail, huge pre-delay. Enormous' },\n    'cave':          { label: 'Cave',          blurb: 'Dark, damp, boomy — bass pushed up, top rolled off' },\n    'tunnel':        { label: 'Tunnel',        blurb: 'Tight, fast, hollow. Spiral path, almost no reverb' },\n    'space':         { label: 'Space',         blurb: 'Widest setting there is. The room keeps orbiting after' },\n    'underwater':    { label: 'Underwater',    blurb: 'Muffled and slow-moving, everything behind you' },\n    'rave':          { label: 'Rave',          blurb: 'Fast, tight, aggressive. Wears you out in a good way' },\n    'sleep':         { label: 'Sleep',         blurb: 'One lap per 40 seconds, barely there. Very gentle' },\n    'cafe':          { label: 'Café',          blurb: 'Sitting in a room with the band off to one side' },\n    'slowed':        { label: 'Slowed',        blurb: 'Pitched down 8% (0.92×) — just slower, with no reverb at all' },\n    'reverb':        { label: 'Reverb',        blurb: 'Full speed, huge hall tail. No slow-mo' },\n    'slowed-reverb': { label: 'Slowed + Reverb', blurb: 'Pitched down 8% (0.92×) with a big warm tail — the classic' },\n    'nightcore':     { label: 'Nightcore',     blurb: 'Sped up and brightened up — the mirror image' },\n    'lofi':          { label: 'Lo-fi',         blurb: 'Fat bottom, rolled-off top, small room' },\n    'boombap':       { label: 'Boom bap',      blurb: 'Hip-hop head-nodder — sub locked centre, slow orbit' },\n    'headphone-test': { label: 'Headphone test', blurb: 'Everything at maximum. Use it to check your cans' },\n  };\n\n  /* =========================================================================\n   * Primitives\n   * ========================================================================= */\n  class Biquad {                                  // single channel state\n    constructor() { this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0; this.x1 = 0; this.x2 = 0; this.y1 = 0; this.y2 = 0; }\n    coefs(c) { this.b0 = c.b0; this.b1 = c.b1; this.b2 = c.b2; this.a1 = c.a1; this.a2 = c.a2; }\n    processW(x, a) {\n      const y = this.y1 + a * (x - this.y1);\n      this.y1 = y;\n      return y;\n    }\n    process(x) {\n      const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;\n      this.x2 = this.x1; this.x1 = x; this.y2 = this.y1; this.y1 = y;\n      return y;\n    }\n    reset() { this.x1 = this.x2 = this.y1 = this.y2 = 0; }\n  }\n\n  // RBJ cookbook coefficients\n  function coLowShelf(fs, f, db, s) {\n    s = s || 0.707;\n    const A = Math.pow(10, db / 40), w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / 2 * Math.sqrt((A + 1 / A) * (1 / s - 1) + 2), tsa = 2 * Math.sqrt(A) * al;\n    const a0 = (A + 1) + (A - 1) * cw + tsa;\n    return { b0: A * ((A + 1) - (A - 1) * cw + tsa) / a0, b1: 2 * A * ((A - 1) - (A + 1) * cw) / a0, b2: A * ((A + 1) - (A - 1) * cw - tsa) / a0,\n             a1: -2 * ((A - 1) + (A + 1) * cw) / a0, a2: ((A + 1) + (A - 1) * cw - tsa) / a0 };\n  }\n  function coHighShelf(fs, f, db, s) {\n    s = s || 0.707;\n    const A = Math.pow(10, db / 40), w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / 2 * Math.sqrt((A + 1 / A) * (1 / s - 1) + 2), tsa = 2 * Math.sqrt(A) * al;\n    const a0 = (A + 1) - (A - 1) * cw + tsa;\n    return { b0: A * ((A + 1) + (A - 1) * cw + tsa) / a0, b1: -2 * A * ((A - 1) + (A + 1) * cw) / a0, b2: A * ((A + 1) + (A - 1) * cw - tsa) / a0,\n             a1: 2 * ((A - 1) - (A + 1) * cw) / a0, a2: ((A + 1) - (A - 1) * cw - tsa) / a0 };\n  }\n  function coPeaking(fs, f, db, q) {\n    const A = Math.pow(10, db / 40), w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / (2 * q), a0 = 1 + al / A;\n    return { b0: (1 + al * A) / a0, b1: -2 * cw / a0, b2: (1 - al * A) / a0, a1: -2 * cw / a0, a2: (1 - al / A) / a0 };\n  }\n  function coLowpass(fs, f, q) {\n    const w = TAU * f / fs, cw = Math.cos(w), sw = Math.sin(w);\n    const al = sw / (2 * (q || 0.707)), a0 = 1 + al;\n    return { b0: (1 - cw) / 2 / a0, b1: (1 - cw) / a0, b2: (1 - cw) / 2 / a0, a1: -2 * cw / a0, a2: (1 - al) / a0 };\n  }\n\n  class Delay {                                    // fractional read, integer write\n    constructor(max) { this.n = Math.max(4, max | 0); this.buf = new Float32Array(this.n); this.i = 0; }\n    write(x) { this.buf[this.i] = x; if (++this.i >= this.n) this.i = 0; }\n    /* read(d) = the sample written exactly d frames ago (0 = the current one).\n     * this.i points at the next write slot, so the newest sample sits at i-1. */\n    read(d) {\n      let p = this.i - 1 - d;\n      while (p < 0) p += this.n;\n      const i = p | 0, f = p - i, j = i + 1 >= this.n ? 0 : i + 1;\n      return this.buf[i] * (1 - f) + this.buf[j] * f;\n    }\n    /* Catmull-Rom read. Used where the delay is modulated (ITD): linearly\n     * interpolating a moving delay line is amplitude-modulated, which shows up\n     * as grit on fast orbits.\n     *\n     * Index order matters here. read() derives its position from the write head,\n     * so a LARGER delay is a LOWER buffer index: y0 (delay i1-1) sits one slot\n     * ahead of y1 (delay i1), not behind it. Getting this backwards scrambles\n     * the four taps and turns interpolation into a discontinuity generator. */\n    readCubic(d) {\n      const i1 = d | 0, f = d - i1, n = this.n;\n      let a = this.i - 1 - i1;            // delay i1\n      let b = a + 1, c = a - 1, e = a - 2; // delays i1-1, i1+1, i1+2\n      a %= n; if (a < 0) a += n;\n      b %= n; if (b < 0) b += n;\n      c %= n; if (c < 0) c += n;\n      e %= n; if (e < 0) e += n;\n      const y0 = this.buf[b], y1 = this.buf[a], y2 = this.buf[c], y3 = this.buf[e];\n      return y1 + 0.5 * f * (y2 - y0 + f * (2 * y0 - 5 * y1 + 4 * y2 - y3 + f * (3 * (y1 - y2) + y3 - y0)));\n    }\n    clear() { this.buf.fill(0); }\n  }\n\n  class Comb {\n    constructor(len) { this.n = len; this.buf = new Float32Array(len); this.i = 0; this.fb = 0.9; this.damp = 0.3; this.store = 0; }\n    process(x) {\n      const y = this.buf[this.i];\n      this.store = y * (1 - this.damp) + this.store * this.damp;\n      this.buf[this.i] = x + this.store * this.fb;\n      if (++this.i >= this.n) this.i = 0;\n      return y;\n    }\n  }\n  class Allpass {\n    constructor(len) { this.n = len; this.buf = new Float32Array(len); this.i = 0; }\n    process(x) {\n      const y = this.buf[this.i], o = -x + y;\n      this.buf[this.i] = x + y * 0.5;\n      if (++this.i >= this.n) this.i = 0;\n      return o;\n    }\n  }\n\n  /* Freeverb: 8 combs + 4 allpasses per channel, right side detuned by +23 samples.\n   * Comb feedback is derived from the RT60 target so the \"Room\" slider is in real seconds. */\n  class Reverb {\n    constructor(fs) {\n      this.fs = fs;\n      const k = fs / 44100;\n      const C = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];\n      const A = [556, 441, 341, 225];\n      const sp = Math.round(23 * k);\n      this.cl = C.map((n) => new Comb(Math.round(n * k) + 8));\n      this.cr = C.map((n) => new Comb(Math.round(n * k) + sp + 8));\n      this.al = A.map((n) => new Allpass(Math.round(n * k) + 4));\n      this.ar = A.map((n) => new Allpass(Math.round(n * k) + sp + 4));\n      this.wetL = 0; this.wetR = 0; this.fixedGain = 0.015;\n      this.set(2.6, 0.35);\n    }\n    set(rt60, damp) {\n      const fs = this.fs;\n      for (const c of this.cl) c.fb = Math.pow(10, -3 * c.n / (rt60 * fs));\n      for (const c of this.cr) c.fb = Math.pow(10, -3 * c.n / (rt60 * fs));\n      for (const c of this.cl) c.damp = damp;\n      for (const c of this.cr) c.damp = damp;\n    }\n    process(l, r) {\n      let a = 0, b = 0;\n      for (let i = 0; i < 8; i++) { a += this.cl[i].process(l); b += this.cr[i].process(r); }\n      for (let i = 0; i < 4; i++) { a = this.al[i].process(a); b = this.ar[i].process(b); }\n      this.wetL = a; this.wetR = b;\n    }\n    clear() { for (const c of this.cl) { c.buf.fill(0); c.store = 0; } for (const c of this.cr) { c.buf.fill(0); c.store = 0; }\n              for (const c of this.al) c.buf.fill(0); for (const c of this.ar) c.buf.fill(0); }\n  }\n\n  /* Linear-phase-free soft clip: perfectly linear below the threshold, then a smooth knee. */\n  function softClip(x, t) {\n    const a = x < 0 ? -x : x;\n    if (a <= t) return x;\n    const s = x < 0 ? -1 : 1;\n    return s * (t + (1 - t) * Math.tanh((a - t) / (1 - t)));\n  }\n\n  /* =========================================================================\n   * Orbit geometry — shared by the engine and the UI canvas.\n   * Writes into a module-level scratch object so the per-sample loop never allocates.\n   * ========================================================================= */\n  const _xy = { x: 0, y: 0 };\n  function orbitXY(t, shape) {\n    switch (shape) {\n      case 'ellipse':   _xy.x = Math.sin(t); _xy.y = Math.cos(t) * 0.35; break;\n      case 'figure8':   _xy.x = Math.sin(t); _xy.y = Math.sin(2 * t) * 0.6; break;\n      case 'pendulum':  _xy.x = Math.sin(t); _xy.y = Math.cos(t) * 0.15; break;\n      case 'spiral': {  const r = 0.5 + 0.5 * Math.abs(Math.sin(t / 2));\n                        _xy.x = Math.sin(t) * r; _xy.y = Math.cos(t) * r; break; }\n      case 'lissajous': _xy.x = Math.sin(3 * t); _xy.y = Math.cos(2 * t); break;\n      default:          _xy.x = Math.sin(t); _xy.y = Math.cos(t);\n    }\n    return _xy;\n  }\n\n  /* =========================================================================\n   * The engine\n   * ========================================================================= */\n  const BLOCK = 128;\n\n  class Orbit8D {\n    constructor(sampleRate, params) {\n      this.fs = sampleRate || 44100;\n      this.version = 2;\n      this.p = Object.assign({}, DEFAULTS, params || {});\n      this.s = Object.assign({}, DEFAULTS);          // smoothed values\n      this.theta = 0; this.laps = 0;\n      this.peak = 0; this.clipped = 0;\n\n      this.bassF = [new Biquad(), new Biquad()];\n      this.airF = [new Biquad(), new Biquad()];\n      this.notch = [new Biquad(), new Biquad()];\n      this.shadow = [new Biquad(), new Biquad()];     // 1-pole head shadow, per ear (cascaded twice)\n      this.shadow2 = [new Biquad(), new Biquad()];\n      this.xfLP = [new Biquad(), new Biquad()];\n      this.monoLP = [new Biquad(), new Biquad()];\n      this.monoLP2 = [new Biquad(), new Biquad()];\n\n      const maxItd = Math.ceil(0.0007 * this.fs) + 4;  // 0.7 ms\n      this.itdL = new Delay(maxItd + 8);\n      this.itdR = new Delay(maxItd + 8);\n      this.xfD = [new Delay(Math.ceil(0.0004 * this.fs) + 4), new Delay(Math.ceil(0.0004 * this.fs) + 4)];\n      this.pre = [new Delay(Math.ceil(0.13 * this.fs)), new Delay(Math.ceil(0.13 * this.fs))];\n      this.verb = new Reverb(this.fs);\n      this.maxItd = 0.00065 * this.fs;\n\n      this._apply(true);\n    }\n\n    /* Merge new parameters. Only the keys present are changed, so the UI can\n     * push a single slider without disturbing anything else. */\n    setParams(params) {\n      for (const k in params) if (params[k] !== undefined && params[k] !== null) this.p[k] = params[k];\n    }\n    reset() {\n      for (const f of [this.bassF, this.airF, this.notch, this.shadow, this.shadow2, this.xfLP, this.monoLP, this.monoLP2])\n        for (const b of f) b.reset();\n      this.itdL.clear(); this.itdR.clear();\n      for (const d of this.xfD) d.clear();\n      for (const d of this.pre) d.clear();\n      this.verb.clear();\n      this.theta = 0; this.peak = 0; this.clipped = 0;\n    }\n\n    /* Smooth + derive coefficients. Called once per 128-frame sub-block. */\n    _apply(force) {\n      const p = this.p, s = this.s, fs = this.fs;\n      const tau = Math.max(0.004, (p.smooth | 0) / 1000);\n      const a = force ? 1 : 1 - Math.exp(-BLOCK / (fs * tau));\n      const keys = ['lap', 'width', 'depth', 'swirl', 'itd', 'behind', 'elevation', 'crossfeed',\n                    'revMix', 'room', 'damp', 'predelay', 'revWidth', 'wetLag', 'bass', 'air', 'gain', 'subFreq'];\n      for (const k of keys) s[k] = force ? p[k] : s[k] + (p[k] - s[k]) * a;\n      for (const k of ['shape', 'ccw', 'sync', 'bpm', 'beats', 'hrtf', 'monoBass', 'normalize', 'limiter', 'phase', 'reverb'])\n        s[k] = p[k];\n\n      this.bassF[0].coefs(coLowShelf(fs, 180, s.bass));  this.bassF[1].coefs(coLowShelf(fs, 180, s.bass));\n      this.airF[0].coefs(coHighShelf(fs, 6000, s.air));  this.airF[1].coefs(coHighShelf(fs, 6000, s.air));\n      this.verb.set(s.room, s.damp);\n\n      // elevation → pinna notch. Unity at 0, so centring it costs nothing.\n      this.useNotch = Math.abs(s.elevation) > 0.02;\n      const nf = clamp(lerp(10200, 6800, (s.elevation + 1) / 2), 4000, 14000);\n      const nc = coPeaking(fs, nf, this.useNotch ? -8 * Math.abs(s.elevation) : 0, 1.2);\n      this.notch[0].coefs(nc); this.notch[1].coefs(nc);\n\n      // crossfeed low-pass (~700 Hz) + mono-bass low-pass (12 dB/oct)\n      const xc = coLowpass(fs, 700, 0.707);\n      this.xfLP[0].coefs(xc); this.xfLP[1].coefs(xc);\n      const sub = clamp(s.subFreq, 40, 300);\n      const w = TAU * sub / fs, c = Math.exp(-w);\n      this.monoLP[0].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n      this.monoLP[1].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n      this.monoLP2[0].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n      this.monoLP2[1].coefs({ b0: 1 - c, b1: 0, b2: 0, a1: -c, a2: 0 });\n\n      // per-orbit rate in radians per sample\n      const lapSec = s.sync ? (60 / s.bpm) * s.beats : s.lap;\n      this.dTheta = TAU / (Math.max(0.05, lapSec) * fs) * (s.ccw ? -1 : 1);\n      if (force) this.theta = (s.phase || 0) * TAU;\n      this.gg = dbToLin(s.gain);\n      this.behindG = dbToLin(-s.behind);\n      this.xfAmt = s.crossfeed;\n      this.wetGain = s.revMix;                       // straight dry/wet balance\n      this.wetLagRad = s.wetLag * TAU;\n      this.itdAmp = s.itd * this.maxItd;\n      this.useHRTF = s.hrtf !== false;\n      this.preSamp = Math.round(clamp(s.predelay, 0, 120) / 1000 * fs);\n    }\n\n    /* Process n frames in place. Internally split into 128-frame sub-blocks. */\n    processBlock(L, R, n) {\n      for (let off = 0; off < n; off += BLOCK) {\n        const count = Math.min(BLOCK, n - off);\n        this._apply(false);\n        this._run(L, R, off, count);\n      }\n      return this;\n    }\n\n    _run(L, R, off, count) {\n      const p = this.p, s = this.s, fs = this.fs;\n      const itdL = this.itdL, itdR = this.itdR;\n      const FMIN = 3200, FMAX = 19000;   // far ear keeps the low end, loses the top\n      const sh0L = this.shadow[0], sh0R = this.shadow[1], sh1L = this.shadow2[0], sh1R = this.shadow2[1];\n      const ntcL = this.notch[0], ntcR = this.notch[1];\n      const b0 = this.bassF[0], b1 = this.bassF[1], a0 = this.airF[0], a1 = this.airF[1];\n      const preL = this.pre[0], preR = this.pre[1];\n      const k2pi_fs = TAU / fs;\n      let theta = this.theta, peak = this.peak, clipped = this.clipped;\n      const t = this;\n\n      for (let i = 0; i < count; i++) {\n        const inL = L[off + i], inR = R[off + i];\n\n        /* --- orbit position --- */\n        theta += t.dTheta;\n        if (theta >= TAU) { theta -= TAU; t.laps++; }\n        else if (theta <= -TAU) { theta += TAU; t.laps--; }\n        const xy = orbitXY(theta, s.shape);\n        const xr = xy.x, yr = xy.y;\n        const x = clamp(xr * s.width, -1.5, 1.5) * (s.ccw ? -1 : 1);   // mirrored for readability\n        const y = clamp(yr * s.depth, -1.5, 1.5);\n\n        /* --- tone (stereo, linked coefficients) --- */\n        let l = a0.process(b0.process(inL));\n        let r = a1.process(b1.process(inR));\n\n        /* --- head cues on the dry path --- */\n        const xc = clamp(x, -1, 1);\n        const ang = (xc + 1) * 0.25 * Math.PI;            // equal power, matches Web Audio StereoPanner\n        const gL = 0.06 + 0.94 * Math.cos(ang);           // 0.06 floor: a hard-muted ear sounds broken\n        const gR = 0.06 + 0.94 * Math.sin(ang);\n\n        const openL = (1 - xc) / 2, openR = (1 + xc) / 2; // 1 = that ear faces the source\n        const behind = clamp((1 - y) / 2, 0, 1);\n        const hr = t.useHRTF ? 1 : 0;\n\n        let cL = FMAX * Math.pow(FMIN / FMAX, (1 - openL) * s.swirl * hr);\n        let cR = FMAX * Math.pow(FMIN / FMAX, (1 - openR) * s.swirl * hr);\n        const bdamp = 1 - 0.55 * behind * hr;\n        cL = clamp(cL * bdamp, 200, FMAX);\n        cR = clamp(cR * bdamp, 200, FMAX);\n        const kaL = 1 - Math.exp(-k2pi_fs * cL);\n        const kaR = 1 - Math.exp(-k2pi_fs * cR);\n        const bg = 1 + (t.behindG - 1) * behind * hr;\n\n        // ITD: the ear facing away hears it late\n        itdL.write(l); itdR.write(r);\n        let dl = itdL.readCubic(t.itdAmp * openR * hr);\n        let dr = itdR.readCubic(t.itdAmp * openL * hr);\n\n        // head shadow: two cascaded 1-poles ≈ 12 dB/oct of occlusion\n        dl = sh1L.processW(sh0L.processW(dl, kaL), kaL);\n        dr = sh1R.processW(sh0R.processW(dr, kaR), kaR);\n        // pinna notch (elevation) — only when it's doing something\n        if (t.useNotch) { dl = ntcL.process(dl); dr = ntcR.process(dr); }\n\n        let outL = dl * gL * bg;\n        let outR = dr * gR * bg;\n\n        /* --- wet path --- */\n        /* Freeverb's 0.015 input scaling already lands the wet near unity;\n         * the dry/wet balance is the revMix control's job, not a hidden fudge. */\n        if (s.reverb && s.revMix > 0) {\n          preL.write(l * t.verb.fixedGain);\n          preR.write(r * t.verb.fixedGain);\n          t.verb.process(preL.read(t.preSamp), preR.read(t.preSamp));\n\n          let vl = t.verb.wetL, vr = t.verb.wetR;\n          const mid = (vl + vr) * 0.5, side = (vl - vr) * 0.5 * s.revWidth;\n          vl = mid + side; vr = mid - side;\n\n          const xyW = orbitXY(theta - t.wetLagRad, s.shape);\n          const xw = clamp(xyW.x * s.width * 1.15, -1.5, 1.5);\n          const angW = (clamp(xw, -1, 1) + 1) * 0.25 * Math.PI;\n          const wgL = 0.04 + 0.96 * Math.cos(angW);\n          const wgR = 0.04 + 0.96 * Math.sin(angW);\n          outL += vl * wgL * t.wetGain;\n          outR += vr * wgR * t.wetGain;\n        } else {\n          /* Keep feeding the network silence so switching reverb off lets an\n           * existing tail ring out instead of cutting it dead (which clicks). */\n          preL.write(0); preR.write(0);\n          t.verb.process(0, 0);\n        }\n\n        /* --- crossfeed --- */\n        if (t.xfAmt > 0) {\n          const d0 = t.xfD[0], d1 = t.xfD[1];\n          d0.write(outR); d1.write(outL);\n          const xs = Math.round(0.0003 * fs);\n          outL += t.xfAmt * t.xfLP[0].process(d0.read(xs));\n          outR += t.xfAmt * t.xfLP[1].process(d1.read(xs));\n        }\n\n        /* --- mono bass --- */\n        if (s.monoBass) {\n          const loL = t.monoLP2[0].process(t.monoLP[0].process(outL));\n          const loR = t.monoLP2[1].process(t.monoLP[1].process(outR));\n          const loM = (loL + loR) * 0.5;\n          outL = (outL - loL) + loM;\n          outR = (outR - loR) + loM;\n        }\n\n        /* --- trim + limiter --- */\n        let oL = outL * t.gg, oR = outR * t.gg;\n        if (s.limiter) { oL = softClip(oL, 0.72); oR = softClip(oR, 0.72); }\n        if (oL > 1 || oL < -1 || oR > 1 || oR < -1) clipped++;\n        const aL = oL < 0 ? -oL : oL; if (aL > peak) peak = aL;\n        const aR = oR < 0 ? -oR : oR; if (aR > peak) peak = aR;\n\n        L[off + i] = oL; R[off + i] = oR;\n      }\n      this.theta = theta; this.peak = peak; this.clipped = clipped;\n    }\n  }\n\n  /* =========================================================================\n   * Slow-mo / speed.\n   *\n   * Resamples the SOURCE, so playing time and pitch move together — what a\n   * record player does at a lower speed, and what the \"slowed\" sound is. Both\n   * render pipelines call this once, up front; live browser playback uses\n   * playbackRate, which is the same operation done natively.\n   *\n   * This is a windowed-sinc resampler with a precomputed phase table, not a\n   * Catmull-Rom interpolator: an interpolator has no stopband, so speeding a\n   * track up folded everything above fs/2/speed back down as aliasing (measured\n   * at -0.7 dB of junk above 19 kHz — plainly audible as fizz). The kernel's\n   * cutoff tracks the rate change, which is what makes it anti-aliased.\n   * ========================================================================= */\n  const RS_TAPS = 14;            // taps either side of the read point\n  const RS_PHASES = 2048;        // phase resolution; drift is < 0.0005 samples\n  const _rsCache = {};\n\n  function resampleKernel(cutoff) {\n    const key = cutoff.toFixed(5);\n    if (_rsCache[key]) return _rsCache[key];\n    const N = RS_TAPS * 2;\n    const table = new Float32Array(RS_PHASES * N);\n    for (let ph = 0; ph < RS_PHASES; ph++) {\n      const frac = ph / RS_PHASES;\n      let sum = 0;\n      for (let k = 0; k < N; k++) {\n        const x = (k - RS_TAPS) - frac;\n        const ax = Math.abs(x);\n        let v = 0;\n        if (ax < RS_TAPS) {\n          const t = cutoff * x;\n          v = (ax < 1e-12 ? 1 : Math.sin(Math.PI * t) / (Math.PI * t)) *\n              (0.42 + 0.5 * Math.cos(Math.PI * x / RS_TAPS) + 0.08 * Math.cos(2 * Math.PI * x / RS_TAPS));\n        }\n        table[ph * N + k] = v;\n        sum += v;\n      }\n      for (let k = 0; k < N; k++) table[ph * N + k] /= sum;     // unity DC gain\n    }\n    _rsCache[key] = { table, N };\n    return _rsCache[key];\n  }\n\n  function resampleTime(L, R, speed) {\n    if (!speed || Math.abs(speed - 1) < 1e-4) return { L, R, speed: 1 };\n    const srclen = L.length;\n    const n = Math.max(2, Math.round(srclen / speed));\n    const oL = new Float32Array(n), oR = new Float32Array(n);\n    /* Speeding up (speed > 1) must band-limit the source or the top end folds.\n     * A 28-tap kernel has a transition band roughly 8 kHz wide, so the cutoff\n     * sits at 80% of nyquist/speed: that puts the whole transition below the\n     * folding point instead of straddling it. Costs the top ~2 kHz of a\n     * sped-up track — inaudible, and far better than audible aliasing. */\n    const cutoff = speed > 1 ? (1 / speed) * 0.8 : 1;\n    const K = resampleKernel(cutoff), N = K.N, tab = K.table;\n    const hasR = !!R;\n    for (let i = 0; i < n; i++) {\n      const p = i * speed;\n      const base = p | 0;\n      const ph = ((p - base) * RS_PHASES) | 0;\n      const off = (ph < RS_PHASES ? ph : RS_PHASES - 1) * N;\n      let aL = 0, aR = 0;\n      for (let k = 0; k < N; k++) {\n        const h = tab[off + k];\n        if (h === 0) continue;\n        let j = base + k - RS_TAPS;\n        if (j < 0) j = 0; else if (j >= srclen) j = srclen - 1;\n        aL += L[j] * h;\n        if (hasR) aR += R[j] * h;\n      }\n      oL[i] = aL;\n      oR[i] = hasR ? aR : aL;\n    }\n    return { L: oL, R: oR, speed, cutoff };\n  }\n\n  /* =========================================================================\n   * True-peak measurement.\n   *\n   * A waveform's real peak sits BETWEEN its samples, and lossy codecs overshoot\n   * it a little further on decode. Normalising to a sample peak of -0.1 dBFS\n   * therefore guarantees clipped playback. This oversamples 4x with a short\n   * windowed sinc to find the real peak — but only near the loud parts, so it\n   * stays cheap on long files.\n   * ========================================================================= */\n  const TP_OV = 4, TP_TAPS = 8;\n  let _tpKernel = null;\n  function truePeakKernel() {\n    if (_tpKernel) return _tpKernel;\n    const N = TP_TAPS * 2;\n    const t = new Float32Array(TP_OV * N);\n    for (let ph = 0; ph < TP_OV; ph++) {\n      const frac = ph / TP_OV;\n      let sum = 0;\n      for (let k = 0; k < N; k++) {\n        const x = (k - TP_TAPS) - frac;\n        const ax = Math.abs(x);\n        let v = 0;\n        if (ax < TP_TAPS) {\n          v = ax < 1e-12 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x);\n          v *= 0.42 + 0.5 * Math.cos(Math.PI * x / TP_TAPS) + 0.08 * Math.cos(2 * Math.PI * x / TP_TAPS);\n        }\n        t[ph * N + k] = v;\n        sum += v;\n      }\n      for (let k = 0; k < N; k++) t[ph * N + k] /= sum;\n    }\n    _tpKernel = { table: t, N };\n    return _tpKernel;\n  }\n\n  function truePeak(L, R) {\n    let peak = 0;\n    for (let i = 0; i < L.length; i++) { const v = L[i] < 0 ? -L[i] : L[i]; if (v > peak) peak = v; }\n    if (R) for (let i = 0; i < R.length; i++) { const v = R[i] < 0 ? -R[i] : R[i]; if (v > peak) peak = v; }\n    if (peak === 0) return { peak: 0, truePeak: 0, overshoot: 0 };\n    const K = truePeakKernel(), N = K.N, tab = K.table;\n    const thr = peak * 0.6;\n    let tp = peak;\n    const chans = R ? [L, R] : [L];\n    for (const a of chans) {\n      const len = a.length;\n      for (let i = 0; i < len; i++) {\n        const v = a[i] < 0 ? -a[i] : a[i];\n        if (v < thr) continue;\n        for (let ph = 1; ph < TP_OV; ph++) {\n          const off = ph * N;\n          let acc = 0;\n          for (let k = 0; k < N; k++) {\n            let j = i + k - TP_TAPS;\n            if (j < 0) j = 0; else if (j >= len) j = len - 1;\n            acc += a[j] * tab[off + k];\n          }\n          const av = acc < 0 ? -acc : acc;\n          if (av > tp) tp = av;\n        }\n      }\n    }\n    return { peak, truePeak: tp, overshoot: 20 * Math.log10(tp / Math.max(peak, 1e-12)) };\n  }\n\n  /* Scale both channels so the TRUE peak lands on targetDbfs. */\n  function normalizeToTruePeak(L, R, targetDbfs) {\n    const target = Math.pow(10, (targetDbfs === undefined ? -1 : targetDbfs) / 20);\n    const m = truePeak(L, R);\n    if (m.truePeak <= 0) return { gain: 1, peak: 0, truePeak: 0 };\n    const g = target / m.truePeak;\n    for (let i = 0; i < L.length; i++) L[i] *= g;\n    if (R) for (let i = 0; i < R.length; i++) R[i] *= g;\n    return { gain: g, peak: m.peak * g, truePeak: target };\n  }\n\n  /* =========================================================================\n   * Buffered convenience wrapper (used by the CLI and the browser renderer)\n   * ========================================================================= */\n  function process8D(L, R, sampleRate, params, onProgress) {\n    const eng = new Orbit8D(sampleRate, params);\n    const n = L.length;\n    const total = Math.ceil(n / 65536);\n    for (let off = 0, blk = 0; off < n; off += 65536, blk++) {\n      const count = Math.min(65536, n - off);\n      eng.processBlock(L.subarray(off, off + count), R.subarray(off, off + count), count);\n      if (onProgress) onProgress((blk + 1) / total);\n    }\n    return eng;\n  }\n\n  /* Measures how much the stereo image actually moves. */\n  function analyzeOrbit(L, R, fs) {\n    const win = Math.max(64, Math.round(fs * 0.05));\n    const pans = [];\n    let sLL = 0, sRR = 0, sLR = 0, pkL = 0, pkR = 0;\n    for (let st = 0; st + win <= L.length; st += win) {\n      let sl = 0, sr = 0, slr = 0;\n      for (let i = st; i < st + win; i++) {\n        const a = L[i], b = R[i];\n        sl += a * a; sr += b * b; slr += a * b;\n        const al = a < 0 ? -a : a, ar = b < 0 ? -b : b;\n        if (al > pkL) pkL = al; if (ar > pkR) pkR = ar;\n      }\n      sLL += sl; sRR += sr; sLR += slr;\n      const rl = Math.sqrt(sl / win), rr = Math.sqrt(sr / win), tot = rl + rr;\n      if (tot > 1e-5) pans.push((rr - rl) / tot);\n    }\n    pans.sort((a, b) => a - b);\n    const q = (f) => (pans.length ? pans[Math.min(pans.length - 1, Math.max(0, Math.floor(f * pans.length)))] : 0);\n    return {\n      swing: q(0.95) - q(0.05), panMin: q(0.05), panMax: q(0.95), panMid: q(0.5),\n      corr: sLR / Math.sqrt((sLL || 1e-12) * (sRR || 1e-12)),\n      rmsL: Math.sqrt(sLL / Math.max(1, L.length)), rmsR: Math.sqrt(sRR / Math.max(1, R.length)),\n      peakL: pkL, peakR: pkR, windows: pans.length,\n    };\n  }\n\n  return { TAU, clamp, dbToLin, linToDb, lerp, Biquad, Delay, Reverb, softClip,\n           PARAMS, DEFAULTS, PRESETS, PRESET_INFO, GROUPS, SHAPES, Orbit8D, orbitXY, process8D, analyzeOrbit,\n           resampleTime, truePeak, normalizeToTruePeak,\n           coLowShelf, coHighShelf, coPeaking, coLowpass };\n});\n";
 
   function ensureCtx() {
     if (ctx) return ctx;
@@ -1738,6 +1989,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     const off = Math.max(0, Math.min(duration - 0.02, fromSec === undefined ? pos : fromSec));
     src = ctx.createBufferSource();
     src.buffer = decoded;
+    src.playbackRate.value = S.speed || 1;     // native slow-mo: time and pitch together
     src.loop = loopOn;
     src.onended = () => { if (!src || src.loop) return; playing = false; pos = 0; updatePlayIcon(); updateTransport(); };
     src.connect(inputGain);
@@ -1762,10 +2014,30 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     updatePlayIcon();
     updateTransport();
   }
+  /* The rate actually in effect right now. Reading it off the source rather
+   * than off S means the playhead maths never jumps when the slider moves. */
+  const appliedRate = () => (src ? (src.playbackRate.value || 1) : (S.speed || 1));
+
   function currentPos() {
     if (!playing || !ctx) return pos;
-    const t = offsetAt + (ctx.currentTime - startedAt);
+    /* the source advances at `appliedRate()` per second of wall clock */
+    const t = offsetAt + (ctx.currentTime - startedAt) * appliedRate();
     return loopOn ? t % duration : Math.min(t, duration);
+  }
+
+  /* Push S.speed at the live source. Changing the rate mid-playback invalidates
+   * the playhead maths, so re-anchor: keep the musical position, restart the
+   * clock. The elapsed part ran at the OLD rate, so measure it before switching. */
+  function syncSpeed() {
+    const rate = S.speed || 1;
+    if (src) {
+      const applied = src.playbackRate.value || 1;
+      if (Math.abs(applied - rate) > 1e-6) {
+        if (playing && ctx) { offsetAt = currentPos(); startedAt = ctx.currentTime; }
+        src.playbackRate.value = rate;
+      }
+    }
+    if (decoded) updateTransport();
   }
   function updatePlayIcon() {
     $('playIcon').innerHTML = playing
@@ -1900,8 +2172,11 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     const c = currentPos();
     const sk = Math.round(c / duration * 1000);
     if (sk !== lastSeek) { $('seek').value = sk; $('seek').style.setProperty('--p', (sk / 10) + '%'); lastSeek = sk; }
-    $('tCur').textContent = fmt(c);
-    $('tDur').textContent = fmt(duration);
+    /* Slow-mo makes the played file longer, so the clock counts the OUTPUT, the
+     * same timeline the size box and the export use. */
+    const rate = appliedRate();
+    $('tCur').textContent = fmt(c / rate);
+    $('tDur').textContent = fmt(duration / rate) + (Math.abs(rate - 1) > 1e-4 ? ' · ' + (+rate.toFixed(2)) + '\u00d7' : '');
   }
 
   function loopRAF() {
@@ -1918,25 +2193,28 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
   const tick = () => new Promise((r) => setTimeout(r, 0));
 
   function updateEstimate() {
-    const d = duration;
+    const d = duration / (S.speed || 1);      // slow-mo makes the export longer
     const isMp3 = fmtSel === 'mp3';
     $('brFld').style.display = isMp3 ? '' : 'none';
     $('dpFld').style.display = isMp3 ? 'none' : '';
     const br = isMp3 ? effectiveBitrate() : 0;
     const mp3B = d * br * 1000 / 8;
     const wavB = d * 44100 * 2 * (dpSel / 8) + 44;
-    $('szSrc').textContent = srcBytes ? fmtSize(srcBytes) : (d ? fmt(d) + ' synthesized' : '—');
+    $('szSrc').textContent = srcBytes ? fmtSize(srcBytes) : (duration ? 'loaded' : '—');
+    $('szDur').textContent = duration ? fmt(d) + (Math.abs((S.speed || 1) - 1) > 1e-4 ? `  (${S.speed}×)` : '') : '—';
     $('szOutLbl').textContent = isMp3 ? `MP3 ${br} kbps` : `WAV ${dpSel}-bit`;
     $('szOut').textContent = d ? fmtSize(isMp3 ? mp3B : wavB) : '—';
     $('szWav').textContent = d ? fmtSize(wavB) : '—';
     if (srcBytes && d) {
       const out = isMp3 ? mp3B : wavB;
       const ratio = srcBytes / out;
+      const sped = Math.abs((S.speed || 1) - 1) > 1e-4;
+      const slowNote = sped ? ` Slowed to <b>${S.speed}×</b>, so the export is <b>${fmt(d)}</b> long instead of ${fmt(duration)}.` : '';
       $('szWhy').innerHTML = isMp3
         ? (Math.abs(ratio - 1) < 0.12
-            ? `Same size as your source, same length of audio — MP3 is compressed, WAV is not.`
-            : `That's <b>${ratio >= 1 ? ratio.toFixed(1) + '× smaller' : (1 / ratio).toFixed(1) + '× bigger'}</b> than your ${fmtSize(srcBytes)} source, with identical duration.`)
-        : `Your ${fmtSize(srcBytes)} source becomes <b>${fmtSize(wavB)}</b> because WAV stores every sample raw. Duration is unchanged — it's just uncompressed. Pick MP3 for a small file.`;
+            ? `Same size as your source, same length of audio — MP3 is compressed, WAV is not.` + slowNote
+            : `That's <b>${ratio >= 1 ? ratio.toFixed(1) + '× smaller' : (1 / ratio).toFixed(1) + '× bigger'}</b> than your ${fmtSize(srcBytes)} source.` + slowNote)
+        : `Your ${fmtSize(srcBytes)} source becomes <b>${fmtSize(wavB)}</b> because WAV stores every sample raw. It is uncompressed — pick MP3 for a small file.` + slowNote;
     }
   }
   function effectiveBitrate() {
@@ -2004,8 +2282,14 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     $('doneBox').style.display = 'none';
     try {
       const sr = decoded.sampleRate;
-      const L = new Float32Array(decoded.getChannelData(0));
-      const R = new Float32Array(decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : decoded.getChannelData(0));
+      let L = new Float32Array(decoded.getChannelData(0));
+      let R = new Float32Array(decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : decoded.getChannelData(0));
+      if (S.speed && Math.abs(S.speed - 1) > 1e-4) {
+        setProg(0.02, `Slow-mo ${S.speed}× — resampling…`);
+        await tick();
+        const rs = resampleTime(L, R, S.speed);
+        L = rs.L; R = rs.R;
+      }
       const eng = new Orbit8D(sr, S);
       const CH = 1 << 18;
       const t0 = performance.now();
@@ -2015,10 +2299,12 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
         setProg((off / L.length) * 0.5, `Orbiting your track… ${Math.round(off / L.length * 100)}%`);
         await tick();
       }
+      /* Normalise on the TRUE peak, not the sample peak — MP3 overshoots between
+       * samples on decode, so a -0.1 dBFS sample peak meant clipped playback. */
+      let truePkDb = null;
       if (S.normalize) {
-        let pk = 0;
-        for (let i = 0; i < L.length; i++) { const a = Math.abs(L[i]); if (a > pk) pk = a; const b = Math.abs(R[i]); if (b > pk) pk = b; }
-        if (pk > 0) { const g = 0.9885 / pk; for (let i = 0; i < L.length; i++) { L[i] *= g; R[i] *= g; } }
+        const nrm = normalizeToTruePeak(L, R, -1.0);
+        if (nrm.truePeak > 0) truePkDb = 20 * Math.log10(nrm.truePeak);
       }
       setProg(0.5, 'Encoding…');
       await tick();
@@ -2037,7 +2323,8 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
       $('progNote').textContent = `Done in ${secs.toFixed(1)}s (${(duration / secs).toFixed(0)}× realtime).`;
       download();
       const a = analyze(L, R, sr);
-      toast(`Rendered ${fname} · swing ${a.swing.toFixed(2)}` + (a.swing > 0.15 ? ' · the orbit moves ✓' : ' · barely moves!'));
+      const tpTxt = truePkDb === null ? 'not normalised' : `true peak ${truePkDb.toFixed(1)} dBFS`;
+      toast(`Rendered ${fname} · swing ${a.swing.toFixed(2)} · ${tpTxt}` + (a.swing > 0.15 ? ' · orbit moves ✓' : ' · barely moves!'));
     } catch (e) {
       toast('Render failed: ' + (e && e.message ? e.message : e), true);
     }
@@ -2069,6 +2356,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
    * 6. Wiring
    * ==================================================================== */
   function init() {
+    loadMine();
     restore();
     buildPresets();
     buildControls();
@@ -2106,7 +2394,7 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
     $('seek').oninput = () => {
       scrub = parseFloat($('seek').value) / 1000 * duration;
       $('seek').style.setProperty('--p', ($('seek').value / 10) + '%');
-      $('tCur').textContent = fmt(scrub);
+      $('tCur').textContent = fmt(scrub / appliedRate());
     };
     $('seek').onchange = () => {
       if (scrub === null) return;

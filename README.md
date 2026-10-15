@@ -27,8 +27,10 @@ the entire application.
 |---|---|
 | **Orbits any track** | Drop in MP3, WAV, M4A, AAC, OGG, FLAC or Opus |
 | **Live preview** | Play as you tweak — every slider updates the sound instantly |
-| **21 presets** | From *Subtle* and *Sleep* to *Vertigo*, *Space* and *Headphone test* |
-| **34 controls** | Motion, space, tone and output — all live |
+| **25 presets** | From *Subtle* and *Sleep* to *Vertigo*, *Space* and *Headphone test* |
+| **36 controls** | Feel, motion, space, tone and output — all live |
+| **Slow-mo** | Drop the speed to 0.5× for slowed-and-pitched-down audio, or push it to 1.5× |
+| **Reverb on/off** | Kill the tail entirely, or dial it up to six seconds |
 | **6 orbit shapes** | Circle, ellipse, figure-8, pendulum, spiral, Lissajous |
 | **Orbit visualiser** | Top-down view showing exactly where the sound is right now |
 | **A/B bypass** | One click to hear the dry track against the 8D version |
@@ -50,13 +52,23 @@ device. It decodes and starts playing straight away. Your file stays on your mac
 
 **2. Pick a preset**
 Start with **Classic** for the familiar 8D feel. **Subtle** is best for real listening;
-**Space** and **Headphone test** push the effect about as far as it goes. Every preset
+**Save preset** keeps whatever you dial — set your own slowed amount, hit Save, and you get
+it back with one click (it stays in your browser as a dashed *My Preset* chip).
+
+**Reset** puts every control back to the defaults — speed included — and the change is live: the track speeds back up as you click it.
+
+**Slowed + Reverb** is the one that makes a song sound dreamy — it drops the pitch 8%
+(0.92×) and puts a big warm tail behind it. **Slowed** does the pitch drop with no reverb at
+all, and **Reverb** gives you the hall tail at full speed, so you can pick which half of
+the effect you want. **Space** and **Headphone test** push the effect
+about as far as it goes. Every preset
 shows a one-line description of what it does, and the panel underneath shows the live
 numbers behind it.
 
 **3. Dial it in**
 Everything under **Controls** applies immediately while the track plays:
 
+- **Feel** — **Speed (slow-mo)**: below 1.00 slows the song and drops the pitch together; and the **Reverb** switch
 - **Motion** — how fast it orbits, how wide and how deep it travels, which path it takes
 - **Space** — head shadow, interaural delay, reverb size and depth, crossfeed, mono bass
 - **Tone** — bass and air
@@ -83,6 +95,8 @@ to the middle of the room.
 | Classic | Subtle | Wide |
 | Intimate | Figure-8 | Pendulum |
 | Spiral | Vertigo | Chaos |
+| Slowed | Reverb | Slowed + Reverb |
+| Nightcore | — | — |
 | Hall | Cathedral | Cave |
 | Tunnel | Space | Underwater |
 | Rave | Sleep | Café |
@@ -125,6 +139,9 @@ file's size.
 - **The engine** is a hand-written DSP chain — bass/air shelving, head-shadow filters,
   fractional-delay interaural time difference, a pinna notch, a Freeverb-style reverb,
   crossfeed, mono bass and a soft limiter — running on the Web Audio API.
+- **Mastering-safe output.** Everything normalises to **−1.0 dBFS true peak** — the real
+  inter-sample peak, not the sample peak — which is the standard ceiling for lossy
+  delivery. That headroom is why the MP3s never crackle.
 - **AudioWorklet.** Live playback runs the engine in an `AudioWorklet` for click-free,
   glitch-free control. On `file://` or non-secure hosts it quietly falls back to an older
   path; over HTTPS (like this deployment) you always get the fast one.
